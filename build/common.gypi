@@ -85,7 +85,8 @@
 
         'include_tests%': 1,
 
-        'webrtc_root%': '<(DEPTH)/src',
+        #'webrtc_root%': '<(DEPTH)/src',
+        'webrtc_root%': '<(DEPTH)/third_party/webrtc',
 
         # TODO(andrew): For now, disable the Chrome plugins, which causes a
         # flood of chromium-style warnings. Investigate enabling them:
