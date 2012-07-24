@@ -23,12 +23,13 @@ LOCAL_SRC_FILES := coder.cc \
     rtp_dump_impl.cc \
     frame_scaler.cc \
     video_coder.cc \
-    video_frames_queue.cc
+    video_frames_queue.cc \
+    audio_frame_operations.cc
 
 # Flags passed to both C and C++ files.
 LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS) \
-    '-DWEBRTC_MODULE_UTILITY_VIDEO'
+    # '-DWEBRTC_MODULE_UTILITY_VIDEO'
 
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../interface \

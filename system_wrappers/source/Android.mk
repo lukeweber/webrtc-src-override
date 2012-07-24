@@ -41,13 +41,15 @@ LOCAL_SRC_FILES := \
     sleep.cc \
     thread_posix.cc \
     trace_posix.cc \
-    rw_lock_posix.cc 
+    rw_lock_posix.cc \
+    ../../../../app/jni/tuenti/threadpriorityhandler.cc
 
 LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
 
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../.. \
+    $(LOCAL_PATH)/../../../../app/jni \
     $(LOCAL_PATH)/../interface \
     $(LOCAL_PATH)/spreadsortlib
 
