@@ -64,6 +64,8 @@
 #include "system_wrappers/interface/event_wrapper.h"
 #include "system_wrappers/interface/trace.h"
 
+#include "tuenti/threadpriorityhandler.h"
+
 namespace webrtc {
 extern "C"
 {
@@ -338,6 +340,33 @@ void ThreadPosix::Run()
 #if (defined(WEBRTC_LINUX) || defined(WEBRTC_ANDROID))
     _pid = GetThreadId();
 #endif
+#if defined(WEBRTC_ANDROID)
+    int tprio = 0;
+    int const minTprio = 20;
+    int const maxTprio = -20;
+
+    switch (_prio)
+    {
+    case kLowPriority:
+        tprio = minTprio - 1;
+        break;
+    case kNormalPriority:
+        tprio =  0;
+        break;
+    case kHighPriority:
+        tprio = maxTprio + 3;
+        break;
+    case kHighestPriority:
+        tprio = maxTprio + 2;
+        break;
+    case kRealtimePriority:
+        tprio = maxTprio + 1;
+        break;
+    }
+
+    tuenti::ThreadPriorityHandler::SetPriority(_pid, tprio);
+#endif
+
     // The event the Start() is waiting for.
     _event->Set();
 
