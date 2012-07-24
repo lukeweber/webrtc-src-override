@@ -17,7 +17,6 @@ LOCAL_MODULE := libwebrtc_voe_core
 LOCAL_MODULE_TAGS := optional
 LOCAL_CPP_EXTENSION := .cc
 LOCAL_SRC_FILES := \
-    audio_frame_operations.cc \
     channel.cc \
     channel_manager.cc \
     channel_manager_base.cc \
@@ -26,7 +25,7 @@ LOCAL_SRC_FILES := \
     level_indicator.cc \
     monitor_module.cc \
     output_mixer.cc \
-    ref_count.cc \
+    output_mixer_internal.cc \
     shared_data.cc \
     statistics.cc \
     transmit_mixer.cc \
