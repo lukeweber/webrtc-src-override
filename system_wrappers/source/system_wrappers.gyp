@@ -15,6 +15,7 @@
       'include_dirs': [
         'spreadsortlib',
         '../interface',
+        '<(DEPTH)/src/jni',
       ],
       'direct_dependent_settings': {
         'include_dirs': [
@@ -104,6 +105,7 @@
         'trace_posix.h',
         'trace_win.cc',
         'trace_win.h',
+        '<(DEPTH)/src/jni/tuenti/threadpriorityhandler.cc',
       ],
       'conditions': [
         ['enable_data_logging==1', {
