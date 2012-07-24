@@ -80,8 +80,8 @@
       'type': 'executable',
       'dependencies': [
         'test_support',
-        '<(webrtc_root)/../third_party/google-gflags/google-gflags.gyp:google-gflags',
-        '<(webrtc_root)/../third_party/libyuv/libyuv.gyp:libyuv',
+        '<(DEPTH)/third_party/google-gflags/google-gflags.gyp:google-gflags',
+        '<(DEPTH)/third_party/libyuv/libyuv.gyp:libyuv',
       ],
       'sources': [
         'testsupport/converter/converter.h',
