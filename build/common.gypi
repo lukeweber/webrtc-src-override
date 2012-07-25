@@ -23,7 +23,7 @@
         ['build_with_chromium==1', {
           'webrtc_root%': '<(DEPTH)/third_party/webrtc',
         }, {
-          'webrtc_root%': '<(DEPTH)/src',
+          'webrtc_root%': '<(DEPTH)/third_party/webrtc',
         }],
       ],
     },
