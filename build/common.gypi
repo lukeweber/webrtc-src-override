@@ -41,7 +41,7 @@
     # Adds video support to dependencies shared by voice and video engine.
     # This should normally be enabled; the intended use is to disable only
     # when building voice engine exclusively.
-    'enable_video%': 1,
+    'enable_video%': 0,
 
     # Selects fixed-point code where possible.
     'prefer_fixed_point%': 0,
@@ -175,7 +175,6 @@
           'WEBRTC_ANDROID',
           # TODO(leozwang): move WEBRTC_ARCH_ARM to typedefs.h.
           'WEBRTC_ARCH_ARM',
-          'WEBRTC_DETECT_ARM_NEON',
           # TODO(leozwang): Investigate CLOCK_REALTIME and CLOCK_MONOTONIC
           # support on Android. Keep WEBRTC_CLOCK_TYPE_REALTIME for now,
           # remove it after I verify that CLOCK_MONOTONIC is fully functional
@@ -183,6 +182,11 @@
           'WEBRTC_CLOCK_TYPE_REALTIME',
           'WEBRTC_THREAD_RR',
           'WEBRTC_ANDROID_OPENSLES',
+         ],
+      }],
+      ['OS=="androd" and armv7==1', {
+        'defines': [
+          'WEBRTC_DETECT_ARM_NEON',
          ],
       }],
     ], # conditions

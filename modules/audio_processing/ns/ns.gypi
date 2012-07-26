@@ -55,7 +55,7 @@
         'nsx_core.h',
       ],
       'conditions': [
-        ['OS=="android"', {
+        ['OS=="android" and armv7==1', {
           'dependencies': [ 'ns_neon', ],
         }],
       ],
