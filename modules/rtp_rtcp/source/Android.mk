@@ -10,7 +10,7 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-include $(LOCAL_PATH)/../../../../android-webrtc.mk
+include $(MY_ROOT_PATH)/android-webrtc.mk
 
 LOCAL_MODULE_CLASS := STATIC_LIBRARIES
 LOCAL_MODULE := libwebrtc_rtp_rtcp
@@ -35,8 +35,10 @@ LOCAL_SRC_FILES := \
     rtp_sender_audio.cc \
     forward_error_correction.cc \
     forward_error_correction_internal.cc \
-    overuse_detector.cc \
-    remote_rate_control.cc \
+    ../../remote_bitrate_estimator/bitrate_estimator.cc \
+    ../../remote_bitrate_estimator/overuse_detector.cc \
+    ../../remote_bitrate_estimator/remote_bitrate_estimator.cc \
+    ../../remote_bitrate_estimator/remote_rate_control.cc \
     rtp_packet_history.cc \
     receiver_fec.cc \
     producer_fec.cc \
@@ -54,7 +56,9 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../interface \
     $(LOCAL_PATH)/../../.. \
     $(LOCAL_PATH)/../../interface \
-    $(LOCAL_PATH)/../../../system_wrappers/interface 
+    $(LOCAL_PATH)/../../../system_wrappers/interface \
+    $(LOCAL_PATH)/../../remote_bitrate_estimator \
+    $(LOCAL_PATH)/../../remote_bitrate_estimator/include
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

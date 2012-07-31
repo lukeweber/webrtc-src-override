@@ -10,7 +10,7 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-include $(LOCAL_PATH)/../../../android-webrtc.mk
+include $(MY_ROOT_PATH)/android-webrtc.mk
 
 LOCAL_ARM_MODE := arm
 LOCAL_MODULE := libwebrtc_system_wrappers
@@ -42,12 +42,13 @@ LOCAL_SRC_FILES := \
     thread_posix.cc \
     trace_posix.cc \
     rw_lock_posix.cc \
-    ../../../../app/jni/tuenti/threadpriorityhandler.cc
+    ../../../../src/jni/tuenti/threadpriorityhandler.cc
 
 LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
 
 LOCAL_C_INCLUDES := \
+    $(MY_ROOT_PATH) \
     $(LOCAL_PATH)/../.. \
     $(LOCAL_PATH)/../../../../app/jni \
     $(LOCAL_PATH)/../interface \

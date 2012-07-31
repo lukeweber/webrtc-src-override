@@ -12,7 +12,7 @@ LOCAL_PATH:= $(call my-dir)
 
 include $(CLEAR_VARS)
 
-include $(LOCAL_PATH)/../../../../../android-webrtc.mk
+include $(MY_ROOT_PATH)/android-webrtc.mk
 
 LOCAL_MODULE_TAGS := tests
 LOCAL_CPP_EXTENSION := .cc
