@@ -42,7 +42,7 @@ LOCAL_SRC_FILES := \
     thread_posix.cc \
     trace_posix.cc \
     rw_lock_posix.cc \
-    ../../../../src/jni/tuenti/threadpriorityhandler.cc
+    ../../../../voice-client-core/jni/tuenti/threadpriorityhandler.cc
 
 LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
