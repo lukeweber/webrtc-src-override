@@ -17,14 +17,14 @@ LOCAL_MODULE := libwebrtc_utility
 LOCAL_MODULE_TAGS := optional
 LOCAL_CPP_EXTENSION := .cc
 LOCAL_SRC_FILES := coder.cc \
+    audio_frame_operations.cc \
     file_player_impl.cc \
     file_recorder_impl.cc \
     process_thread_impl.cc \
     rtp_dump_impl.cc \
     frame_scaler.cc \
     video_coder.cc \
-    video_frames_queue.cc \
-    audio_frame_operations.cc
+    video_frames_queue.cc
 
 # Flags passed to both C and C++ files.
 LOCAL_CFLAGS := \

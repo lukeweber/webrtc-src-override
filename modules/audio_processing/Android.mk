@@ -63,7 +63,6 @@ endif
 include $(BUILD_STATIC_LIBRARY)
 
 # apm process test app
-
 # include $(CLEAR_VARS)
 
 # LOCAL_MODULE_TAGS := tests
