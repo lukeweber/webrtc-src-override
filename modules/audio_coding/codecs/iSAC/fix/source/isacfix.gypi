@@ -71,7 +71,7 @@
             'WEBRTC_LINUX',
           ],
         }],
-        ['OS=="android"', {
+        ['OS=="android and armv7==1"', {
           'dependencies': [ 'isac_neon', ],
         }],
       ],
