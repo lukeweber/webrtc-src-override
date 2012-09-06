@@ -176,8 +176,12 @@
         'defines': [
           'WEBRTC_LINUX',
           'WEBRTC_ANDROID',
+          # Alex: I commented out armv7 and non that were enabled by default
+          # and pushed them down where we check agains armv7===1
           # TODO(leozwang): move WEBRTC_ARCH_ARM to typedefs.h.
           'WEBRTC_ARCH_ARM',
+          # 'WEBRTC_ARCH_ARM_V7A', # Set default platform to ARMv7.
+          # 'WEBRTC_DETECT_ARM_NEON',
           # TODO(leozwang): Investigate CLOCK_REALTIME and CLOCK_MONOTONIC
           # support on Android. Keep WEBRTC_CLOCK_TYPE_REALTIME for now,
           # remove it after I verify that CLOCK_MONOTONIC is fully functional
@@ -190,6 +194,7 @@
       ['OS=="androd" and armv7==1', {
         'defines': [
           'WEBRTC_DETECT_ARM_NEON',
+          'WEBRTC_ARCH_ARM_V7A', # Set default platform to ARMv7.
          ],
       }],
     ], # conditions
