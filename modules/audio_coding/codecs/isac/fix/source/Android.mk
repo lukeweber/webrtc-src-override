@@ -52,6 +52,7 @@ LOCAL_SRC_FILES += \
     pitchfilter_armv6.S
 else
 LOCAL_SRC_FILES += \
+    pitch_filter_c.c \
     lattice_c.c
 endif
 
