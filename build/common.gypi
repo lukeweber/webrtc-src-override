@@ -138,6 +138,27 @@
           }],
         ],
       }],
+      ['target_arch=="arm"', {
+        'defines': [
+          'WEBRTC_ARCH_ARM',
+        ],
+        'conditions': [
+          ['armv7==1', {
+            'defines': [
+              'WEBRTC_ARCH_ARM_V7',
+              'WEBRTC_DETECT_ARM_NEON',
+            ],
+          }],
+          ['arm_neon==1', {
+            'defines': [
+              'WEBRTC_ARCH_ARM_NEON',
+            ],
+            'defines!': [
+              'WEBRTC_DETECT_ARM_NEON',
+            ],
+          }],
+        ],
+      }],
       ['OS=="linux"', {
         'defines': [
           'WEBRTC_LINUX',
@@ -170,13 +191,10 @@
         'msvs_disabled_warnings!': [4189,],
       }],
       ['OS=="android"', {
-        # On Android, we always prefer fixed_point to reduce CPU usage.
-        'prefer_fixed_point%': 1,
-
         'defines': [
           'WEBRTC_LINUX',
           'WEBRTC_ANDROID',
-          # Alex: I commented out armv7 and non that were enabled by default
+          # Alex: I commented out armv7 and neon that were enabled by default
           # and pushed them down where we check agains armv7===1
           # TODO(leozwang): move WEBRTC_ARCH_ARM to typedefs.h.
           'WEBRTC_ARCH_ARM',
