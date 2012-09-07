@@ -21,8 +21,8 @@ include $(MY_WEBRTC_ROOT_PATH)/$(MY_WEBRTC_SRC_PATH)/src/modules/audio_coding/co
 include $(MY_WEBRTC_ROOT_PATH)/$(MY_WEBRTC_SRC_PATH)/src/modules/audio_coding/codecs/g722/Android.mk
 include $(MY_WEBRTC_ROOT_PATH)/$(MY_WEBRTC_SRC_PATH)/src/modules/audio_coding/codecs/pcm16b/Android.mk
 include $(MY_WEBRTC_ROOT_PATH)/$(MY_WEBRTC_SRC_PATH)/src/modules/audio_coding/codecs/ilbc/Android.mk
-include $(MY_WEBRTC_ROOT_PATH)/$(MY_WEBRTC_SRC_PATH)/src/modules/audio_coding/codecs/iSAC/fix/source/Android.mk
-include $(MY_WEBRTC_ROOT_PATH)/$(MY_WEBRTC_SRC_PATH)/src/modules/audio_coding/codecs/iSAC/main/source/Android.mk
+include $(MY_WEBRTC_ROOT_PATH)/$(MY_WEBRTC_SRC_PATH)/src/modules/audio_coding/codecs/isac/fix/source/Android.mk
+include $(MY_WEBRTC_ROOT_PATH)/$(MY_WEBRTC_SRC_PATH)/src/modules/audio_coding/codecs/isac/main/source/Android.mk
 include $(MY_WEBRTC_ROOT_PATH)/$(MY_WEBRTC_SRC_PATH)/src/modules/audio_coding/main/source/Android.mk
 include $(MY_WEBRTC_ROOT_PATH)/$(MY_WEBRTC_SRC_PATH)/src/modules/audio_conference_mixer/source/Android.mk
 include $(MY_WEBRTC_ROOT_PATH)/$(MY_WEBRTC_SRC_PATH)/src/modules/audio_device/main/source/Android.mk
