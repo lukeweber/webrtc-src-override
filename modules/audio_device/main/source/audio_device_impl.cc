@@ -10,6 +10,7 @@
 
 #include "audio_device_impl.h"
 #include "audio_device_config.h"
+#include "common_audio/signal_processing/include/signal_processing_library.h"
 #include "system_wrappers/interface/ref_count.h"
 
 #include <assert.h>
@@ -38,9 +39,9 @@
     #include "audio_device_pulse_linux.h"
  #endif
 #elif defined(MAC_IPHONE)
-    #include "audio_device_utility_iphone.h"
-    #include "audio_device_iphone.h"
-#elif (defined(WEBRTC_MAC_INTEL) || defined(WEBRTC_MAC))
+    #include "audio_device_utility_ios.h"
+    #include "audio_device_ios.h"
+#elif defined(WEBRTC_MAC)
     #include "audio_device_utility_mac.h"
     #include "audio_device_mac.h"
 #endif
@@ -159,7 +160,10 @@ WebRtc_Word32 AudioDeviceModuleImpl::CheckPlatform()
 #elif defined(WEBRTC_LINUX)
     platform = kPlatformLinux;
     WEBRTC_TRACE(kTraceInfo, kTraceAudioDevice, _id, "current platform is LINUX");
-#elif (defined(WEBRTC_MAC_INTEL) || defined(WEBRTC_MAC))
+#elif defined(MAC_IPHONE)
+    platform = kPlatformIOS;
+    WEBRTC_TRACE(kTraceInfo, kTraceAudioDevice, _id, "current platform is IOS");
+#elif defined(WEBRTC_MAC)
     platform = kPlatformMac;
     WEBRTC_TRACE(kTraceInfo, kTraceAudioDevice, _id, "current platform is MAC");
 #endif
@@ -354,7 +358,7 @@ WebRtc_Word32 AudioDeviceModuleImpl::CreatePlatformSpecificObjects()
 
     // Create the *Mac* implementation of the Audio Device
     //
-#elif defined(WEBRTC_MAC_INTEL) || defined(WEBRTC_MAC)
+#elif defined(WEBRTC_MAC)
     if (audioLayer == kPlatformDefaultAudio)
     {
         // Create *Mac Audio* implementation
@@ -367,7 +371,7 @@ WebRtc_Word32 AudioDeviceModuleImpl::CreatePlatformSpecificObjects()
         // Create the Mac implementation of the Device Utility.
         ptrAudioDeviceUtility = new AudioDeviceUtilityMac(Id());
     }
-#endif  // #if defined(WEBRTC_MAC_INTEL) || defined(WEBRTC_MAC)
+#endif  // WEBRTC_MAC
 
     // Create the *Dummy* implementation of the Audio Device
     // Available for all platforms
@@ -603,6 +607,8 @@ WebRtc_Word32 AudioDeviceModuleImpl::Init()
 
     if (!_ptrAudioDevice)
         return -1;
+
+    WebRtcSpl_Init();
 
     _ptrAudioDeviceUtility->Init();
 

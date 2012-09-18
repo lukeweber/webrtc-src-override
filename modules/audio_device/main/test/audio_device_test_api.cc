@@ -1688,7 +1688,8 @@ TEST_F(AudioDeviceAPITest, CPULoad) {
 }
 
 // TODO(kjellander): Fix flakiness causing failures on Windows.
-#if !defined(_WIN32)
+// TODO(phoglund):  Fix flakiness causing failures on Linux.
+#if !defined(_WIN32) && !defined(WEBRTC_LINUX)
 TEST_F(AudioDeviceAPITest, StartAndStopRawOutputFileRecording) {
   // NOTE: this API is better tested in a functional test
   CheckInitialPlayoutStates();
@@ -1759,8 +1760,7 @@ TEST_F(AudioDeviceAPITest, StartAndStopRawInputFileRecording) {
   // - size of raw_input_not_recording.pcm shall be 0
   // - size of raw_input_not_recording.pcm shall be > 0
 }
-#endif  // !WEBRTC_LINUX
-#endif  // !WIN32
+#endif  // !WIN32 && !WEBRTC_LINUX
 
 TEST_F(AudioDeviceAPITest, RecordingSampleRate) {
   WebRtc_UWord32 sampleRate(0);

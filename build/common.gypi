@@ -60,6 +60,7 @@
     # Disable these to not build components which can be externally provided.
     'build_libjpeg%': 1,
     'build_libyuv%': 1,
+    'build_libvpx%': 1,
 
     'libyuv_dir%': '<(DEPTH)/third_party/libyuv',
 
@@ -97,6 +98,14 @@
         # flood of chromium-style warnings. Investigate enabling them:
         # http://code.google.com/p/webrtc/issues/detail?id=163
         'clang_use_chrome_plugins%': 0,
+      }],
+      ['OS=="ios"', {
+        'enable_video%': 0,
+        'enable_protobuf%': 0,
+        'build_libjpeg%': 0,
+        'build_libyuv%': 0,
+        'build_libvpx%': 0,
+        'include_tests%': 0,
       }],
     ], # conditions
   },
@@ -156,6 +165,14 @@
           }],
         ],
       }],
+      ['OS=="ios"', {
+        'defines': [
+          'WEBRTC_MAC',
+          'MAC_IPHONE', # TODO(sjlee): This should be changed to WEBRTC_IOS.
+          'WEBRTC_THREAD_RR',
+          'WEBRTC_CLOCK_TYPE_REALTIME',
+        ],
+      }],
       ['OS=="linux"', {
         'defines': [
           'WEBRTC_LINUX',
@@ -168,7 +185,6 @@
       ['OS=="mac"', {
         'defines': [
           'WEBRTC_MAC',
-          'WEBRTC_MAC_INTEL',  # TODO(andrew): remove this.
           'WEBRTC_THREAD_RR',
           'WEBRTC_CLOCK_TYPE_REALTIME',
         ],
@@ -194,7 +210,7 @@
           'WEBRTC_LINUX',
           'WEBRTC_ANDROID',
           # Alex: I commented out armv7 and neon that were enabled by default
-          # and pushed them down where we check agains armv7===1
+          # and pushed them down where we check against armv7==1
           # TODO(leozwang): move WEBRTC_ARCH_ARM to typedefs.h.
           'WEBRTC_ARCH_ARM',
           # 'WEBRTC_ARCH_ARM_V7A', # Set default platform to ARMv7.
