@@ -24,19 +24,13 @@
 #include "thread_wrapper.h"
 #include "event_wrapper.h"
 
-// Android logging, uncomment to print trace to logcat instead of
-// trace file/callback
-//#include <android/log.h>
-//#define WEBRTC_TRACE(a,b,c,...)  __android_log_print(ANDROID_LOG_DEBUG, \
-//    "WebRTC AD jni", __VA_ARGS__)
-
 namespace webrtc
 {
 
-JavaVM* globalJvm = NULL;
-JNIEnv* globalJNIEnv = NULL;
-jobject globalSndContext = NULL;
-jclass globalScClass = NULL;
+JavaVM* AudioDeviceAndroidJni::globalJvm = NULL;
+JNIEnv* AudioDeviceAndroidJni::globalJNIEnv = NULL;
+jobject AudioDeviceAndroidJni::globalContext = NULL;
+jclass AudioDeviceAndroidJni::globalScClass = NULL;
 
 // ----------------------------------------------------------------------------
 //  SetAndroidAudioDeviceObjects
@@ -46,69 +40,60 @@ jclass globalScClass = NULL;
 //  by the same Java application.
 // ----------------------------------------------------------------------------
 
-WebRtc_Word32 SetAndroidAudioDeviceObjects(void* javaVM, void* env,
-                                           void* context)
-{
-    WEBRTC_TRACE(kTraceDebug, kTraceAudioDevice, -1, "%s",
-                 __FUNCTION__);
+WebRtc_Word32 AudioDeviceAndroidJni::SetAndroidAudioDeviceObjects(
+    void* javaVM,
+    void* env,
+    void* context) {
+  // TODO(leozwang): Make this function thread-safe.
+  globalJvm = reinterpret_cast<JavaVM*>(javaVM);
 
-    globalJvm = (JavaVM*) javaVM;
-    globalSndContext = (jobject) context;
-
-    if (env)
-    {
-        globalJNIEnv = (JNIEnv *) env;
-
-        WEBRTC_TRACE(kTraceDebug, kTraceAudioDevice, -1,
-                     "%s: will find class", __FUNCTION__);
-
-        // get java class type (note path to class packet)
-        jclass
-                javaScClassLocal =
-                        globalJNIEnv->FindClass(
-                                "org/webrtc/voiceengine/AudioDeviceAndroid");
-        if (!javaScClassLocal)
-        {
-            WEBRTC_TRACE(kTraceError, kTraceAudioDevice, -1,
-                         "%s: could not find java class", __FUNCTION__);
-            return -1; /* exception thrown */
-        }
-
-        WEBRTC_TRACE(kTraceDebug, kTraceAudioDevice, -1,
-                     "%s: will create global reference", __FUNCTION__);
-
-        // create a global reference to the class (to tell JNI that we are
-        // referencing it after this function has returned)
-        globalScClass
-                = reinterpret_cast<jclass> (globalJNIEnv->NewGlobalRef(
-                        javaScClassLocal));
-        if (!globalScClass)
-        {
-            WEBRTC_TRACE(kTraceError, kTraceAudioDevice, -1,
-                         "%s: could not create reference", __FUNCTION__);
-            return -1;
-        }
-
-        // Delete local class ref, we only use the global ref
-        globalJNIEnv->DeleteLocalRef(javaScClassLocal);
-    }
-    else // User is resetting the env variable
-    {
-        WEBRTC_TRACE(kTraceStateInfo, kTraceAudioDevice, -1,
-                     "%s: env is NULL, assuming deinit", __FUNCTION__);
-
-        if (!globalJNIEnv)
-        {
-            WEBRTC_TRACE(kTraceWarning, kTraceAudioDevice, -1,
-                         "%s: saved env already NULL", __FUNCTION__);
-            return 0;
-        }
-
-        globalJNIEnv->DeleteGlobalRef(globalScClass);
-        globalJNIEnv = (JNIEnv *) NULL;
+  if (env) {
+    globalJNIEnv = reinterpret_cast<JNIEnv*>(env);
+    // Get java class type (note path to class packet).
+    jclass javaScClassLocal = globalJNIEnv->FindClass(
+        "org/webrtc/voiceengine/AudioDeviceAndroid");
+    if (!javaScClassLocal) {
+      WEBRTC_TRACE(kTraceError, kTraceAudioDevice, -1,
+                   "%s: could not find java class", __FUNCTION__);
+      return -1; // exception thrown
     }
 
-    return 0;
+    // Create a global reference to the class (to tell JNI that we are
+    // referencing it after this function has returned).
+    globalScClass = reinterpret_cast<jclass> (
+        globalJNIEnv->NewGlobalRef(javaScClassLocal));
+    if (!globalScClass) {
+      WEBRTC_TRACE(kTraceError, kTraceAudioDevice, -1,
+                   "%s: could not create reference", __FUNCTION__);
+      return -1;
+    }
+
+    globalContext = globalJNIEnv->NewGlobalRef(
+        reinterpret_cast<jobject>(context));
+    if (!globalContext) {
+      WEBRTC_TRACE(kTraceError, kTraceAudioDevice, -1,
+                   "%s: could not create context reference", __FUNCTION__);
+      return -1;
+    }
+
+    // Delete local class ref, we only use the global ref
+    globalJNIEnv->DeleteLocalRef(javaScClassLocal);
+  }
+  else { // User is resetting the env variable
+    WEBRTC_TRACE(kTraceStateInfo, kTraceAudioDevice, -1,
+                 "%s: env is NULL, assuming deinit", __FUNCTION__);
+
+    if (!globalJNIEnv) {
+      WEBRTC_TRACE(kTraceWarning, kTraceAudioDevice, -1,
+                   "%s: saved env already NULL", __FUNCTION__);
+      return 0;
+    }
+
+    globalJNIEnv->DeleteGlobalRef(globalScClass);
+    globalJNIEnv = reinterpret_cast<JNIEnv*>(NULL);
+  }
+
+  return 0;
 }
 
 // ============================================================================
@@ -434,6 +419,9 @@ WebRtc_Word32 AudioDeviceAndroidJni::Terminate()
     _javaMidRecAudio = 0;
     _javaDirectPlayBuffer = NULL;
     _javaDirectRecBuffer = NULL;
+
+    env->DeleteGlobalRef(_javaContext);
+    _javaContext = NULL;
 
     // Delete the references to the java buffers, this allows the
     // garbage collector to delete them
@@ -2173,7 +2161,7 @@ WebRtc_Word32 AudioDeviceAndroidJni::InitJavaResources()
 {
     // todo: Check if we already have created the java object
     _javaVM = globalJvm;
-    _javaContext = globalSndContext;
+    _javaContext = globalContext;
     _javaScClass = globalScClass;
 
     // use the jvm that has been set
@@ -2228,8 +2216,8 @@ WebRtc_Word32 AudioDeviceAndroidJni::InitJavaResources()
         return -1;
     }
 
-    // create a reference to the object (to tell JNI that we are referencing it
-    // after this function has returned)
+    // Create a reference to the object (to tell JNI that we are referencing it
+    // after this function has returned).
     _javaScObj = env->NewGlobalRef(javaScObjLocal);
     if (!_javaScObj)
     {
@@ -2239,55 +2227,42 @@ WebRtc_Word32 AudioDeviceAndroidJni::InitJavaResources()
         return -1;
     }
 
-    // Delete local object ref, we only use the global ref
+    // Delete local object ref, we only use the global ref.
     env->DeleteLocalRef(javaScObjLocal);
 
     //////////////////////
     // AUDIO MANAGEMENT
 
     // This is not mandatory functionality
-    if (_javaContext)
-    {
-        // Get Context field ID
-        jfieldID fidContext = env->GetFieldID(_javaScClass, "_context",
-                                              "Landroid/content/Context;");
-        if (!fidContext)
-        {
-            WEBRTC_TRACE(kTraceError, kTraceAudioDevice, _id,
-                         "%s: could not get Context fid", __FUNCTION__);
-            return -1;
-        }
+    if (_javaContext) {
+      jfieldID context_id = env->GetFieldID(globalScClass,
+                                            "_context",
+                                            "Landroid/content/Context;");
+      if (!context_id) {
+        WEBRTC_TRACE(kTraceError, kTraceAudioDevice, _id,
+                     "%s: could not get _context id", __FUNCTION__);
+        return -1;
+      }
 
-        // Set the Java application Context so we can use AudioManager
-        // Get Context object and check it
-        jobject javaContext = (jobject) _javaContext;
-        env->SetObjectField(_javaScObj, fidContext, javaContext);
-        javaContext = env->GetObjectField(_javaScObj, fidContext);
-        if (!javaContext)
-        {
-            WEBRTC_TRACE(kTraceError, kTraceAudioDevice, _id,
-                         "%s: could not set Context", __FUNCTION__);
-            return -1;
-        }
-
-        // Delete local object ref
-        env->DeleteLocalRef(javaContext);
+      env->SetObjectField(_javaScObj, context_id, globalContext);
+      jobject javaContext = env->GetObjectField(_javaScObj, context_id);
+      if (!javaContext) {
+        WEBRTC_TRACE(kTraceError, kTraceAudioDevice, _id,
+                     "%s: could not set or get _context", __FUNCTION__);
+        return -1;
+      }
     }
-    else
-    {
-        WEBRTC_TRACE(
-                     kTraceWarning,
-                     kTraceAudioDevice,
-                     _id,
-                     "%s: did not set Context - some functionality is not "
-                     "supported",
-                     __FUNCTION__);
+    else {
+      WEBRTC_TRACE(kTraceWarning, kTraceAudioDevice, _id,
+                   "%s: did not set Context - some functionality is not "
+                   "supported",
+                   __FUNCTION__);
     }
 
     /////////////
     // PLAYOUT
 
-    // Get play buffer field ID
+    // Get play buffer field ID.
     jfieldID fidPlayBuffer = env->GetFieldID(_javaScClass, "_playBuffer",
                                              "Ljava/nio/ByteBuffer;");
     if (!fidPlayBuffer)
@@ -2297,7 +2272,7 @@ WebRtc_Word32 AudioDeviceAndroidJni::InitJavaResources()
         return -1;
     }
 
-    // Get play buffer object
+    // Get play buffer object.
     jobject javaPlayBufferLocal =
             env->GetObjectField(_javaScObj, fidPlayBuffer);
     if (!javaPlayBufferLocal)
@@ -2309,7 +2284,7 @@ WebRtc_Word32 AudioDeviceAndroidJni::InitJavaResources()
 
     // Create a global reference to the object (to tell JNI that we are
     // referencing it after this function has returned)
-    // NOTE: we are referencing it only through the direct buffer (see below)
+    // NOTE: we are referencing it only through the direct buffer (see below).
     _javaPlayBuffer = env->NewGlobalRef(javaPlayBufferLocal);
     if (!_javaPlayBuffer)
     {
@@ -2318,10 +2293,10 @@ WebRtc_Word32 AudioDeviceAndroidJni::InitJavaResources()
         return -1;
     }
 
-    // Delete local object ref, we only use the global ref
+    // Delete local object ref, we only use the global ref.
     env->DeleteLocalRef(javaPlayBufferLocal);
 
-    // Get direct buffer
+    // Get direct buffer.
     _javaDirectPlayBuffer = env->GetDirectBufferAddress(_javaPlayBuffer);
     if (!_javaDirectPlayBuffer)
     {
@@ -2330,7 +2305,7 @@ WebRtc_Word32 AudioDeviceAndroidJni::InitJavaResources()
         return -1;
     }
 
-    // Get the play audio method ID
+    // Get the play audio method ID.
     _javaMidPlayAudio = env->GetMethodID(_javaScClass, "PlayAudio", "(I)I");
     if (!_javaMidPlayAudio)
     {
@@ -2342,7 +2317,7 @@ WebRtc_Word32 AudioDeviceAndroidJni::InitJavaResources()
     //////////////
     // RECORDING
 
-    // Get rec buffer field ID
+    // Get rec buffer field ID.
     jfieldID fidRecBuffer = env->GetFieldID(_javaScClass, "_recBuffer",
                                             "Ljava/nio/ByteBuffer;");
     if (!fidRecBuffer)
@@ -2352,7 +2327,7 @@ WebRtc_Word32 AudioDeviceAndroidJni::InitJavaResources()
         return -1;
     }
 
-    // Get rec buffer object
+    // Get rec buffer object.
     jobject javaRecBufferLocal = env->GetObjectField(_javaScObj, fidRecBuffer);
     if (!javaRecBufferLocal)
     {
@@ -2363,7 +2338,7 @@ WebRtc_Word32 AudioDeviceAndroidJni::InitJavaResources()
 
     // Create a global reference to the object (to tell JNI that we are
     // referencing it after this function has returned)
-    // NOTE: we are referencing it only through the direct buffer (see below)
+    // NOTE: we are referencing it only through the direct buffer (see below).
     _javaRecBuffer = env->NewGlobalRef(javaRecBufferLocal);
     if (!_javaRecBuffer)
     {
@@ -2372,10 +2347,10 @@ WebRtc_Word32 AudioDeviceAndroidJni::InitJavaResources()
         return -1;
     }
 
-    // Delete local object ref, we only use the global ref
+    // Delete local object ref, we only use the global ref.
     env->DeleteLocalRef(javaRecBufferLocal);
 
-    // Get direct buffer
+    // Get direct buffer.
     _javaDirectRecBuffer = env->GetDirectBufferAddress(_javaRecBuffer);
     if (!_javaDirectRecBuffer)
     {
@@ -2384,7 +2359,7 @@ WebRtc_Word32 AudioDeviceAndroidJni::InitJavaResources()
         return -1;
     }
 
-    // Get the rec audio method ID
+    // Get the rec audio method ID.
     _javaMidRecAudio = env->GetMethodID(_javaScClass, "RecordAudio", "(I)I");
     if (!_javaMidRecAudio)
     {
@@ -2393,7 +2368,7 @@ WebRtc_Word32 AudioDeviceAndroidJni::InitJavaResources()
         return -1;
     }
 
-    // Detach this thread if it was attached
+    // Detach this thread if it was attached.
     if (isAttached)
     {
         if (_javaVM->DetachCurrentThread() < 0)
@@ -2409,9 +2384,9 @@ WebRtc_Word32 AudioDeviceAndroidJni::InitJavaResources()
 // ----------------------------------------------------------------------------
 //  InitSampleRate
 //
-//  checks supported sample rates for playback 
+//  checks supported sample rates for playback
 //  and recording and initializes the rates to be used
-//  Also stores the max playout volume returned from InitPlayout
+//  Also stores the max playout volume returned from InitPlayout.
 // ----------------------------------------------------------------------------
 
 WebRtc_Word32 AudioDeviceAndroidJni::InitSampleRate()
