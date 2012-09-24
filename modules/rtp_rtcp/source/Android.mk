@@ -37,8 +37,10 @@ LOCAL_SRC_FILES := \
     forward_error_correction_internal.cc \
     ../../remote_bitrate_estimator/bitrate_estimator.cc \
     ../../remote_bitrate_estimator/overuse_detector.cc \
-    ../../remote_bitrate_estimator/remote_bitrate_estimator.cc \
+    ../../remote_bitrate_estimator/remote_bitrate_estimator_single_stream.cc \
+    ../../remote_bitrate_estimator/remote_bitrate_estimator_multi_stream.cc \
     ../../remote_bitrate_estimator/remote_rate_control.cc \
+    ../../../video_engine/stream_synchronization.cc \
     rtp_packet_history.cc \
     receiver_fec.cc \
     producer_fec.cc \
