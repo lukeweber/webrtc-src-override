@@ -37,12 +37,12 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/android \
     $(LOCAL_PATH)/dummy \
     $(LOCAL_PATH)/linux \
+    $(LOCAL_PATH)/include \
     $(LOCAL_PATH)/../interface \
-    $(LOCAL_PATH)/../../../.. \
-    $(LOCAL_PATH)/../../../interface \
-    $(LOCAL_PATH)/../../../../common_audio/resampler/include \
-    $(LOCAL_PATH)/../../../../common_audio/signal_processing/include \
-    $(LOCAL_PATH)/../../../../system_wrappers/interface \
+    $(LOCAL_PATH)/../.. \
+    $(LOCAL_PATH)/../../common_audio/resampler/include \
+    $(LOCAL_PATH)/../../common_audio/signal_processing/include \
+    $(LOCAL_PATH)/../../system_wrappers/interface \
     system/media/wilhelm/include
 
 LOCAL_SHARED_LIBRARIES := \
