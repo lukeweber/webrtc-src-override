@@ -40,6 +40,7 @@ LOCAL_SRC_FILES := \
     ../../remote_bitrate_estimator/remote_bitrate_estimator_single_stream.cc \
     ../../remote_bitrate_estimator/remote_bitrate_estimator_multi_stream.cc \
     ../../remote_bitrate_estimator/remote_rate_control.cc \
+    ../../remote_bitrate_estimator/rtp_to_ntp.cc \
     ../../../video_engine/stream_synchronization.cc \
     rtp_packet_history.cc \
     receiver_fec.cc \
