@@ -17,13 +17,13 @@
 
 #include "modules/remote_bitrate_estimator/bitrate_estimator.h"
 #include "modules/remote_bitrate_estimator/include/remote_bitrate_estimator.h"
+#include "modules/remote_bitrate_estimator/include/rtp_to_ntp.h"
 #include "modules/remote_bitrate_estimator/overuse_detector.h"
 #include "modules/remote_bitrate_estimator/remote_rate_control.h"
 #include "system_wrappers/interface/constructor_magic.h"
 #include "system_wrappers/interface/critical_section_wrapper.h"
 #include "system_wrappers/interface/scoped_ptr.h"
 #include "typedefs.h"
-#include "video_engine/stream_synchronization.h"
 
 namespace webrtc {
 
