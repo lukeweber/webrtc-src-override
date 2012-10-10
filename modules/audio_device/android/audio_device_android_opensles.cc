@@ -10,6 +10,7 @@
 
 #include <sys/resource.h>
 #include <sys/syscall.h>
+#include <sys/system_properties.h>
 #include <sys/time.h>
 #include <time.h>
 
@@ -21,11 +22,11 @@
 #include "thread_wrapper.h"
 #include "event_wrapper.h"
 
-#ifdef WEBRTC_ANDROID_DEBUG
-#include <android/log.h>
-#define WEBRTC_TRACE(a,b,c,...)  __android_log_print(                  \
-           ANDROID_LOG_DEBUG, "WebRTC ADM OpenSLES", __VA_ARGS__)
-#endif
+//#ifdef WEBRTC_ANDROID_DEBUG
+//#include <android/log.h>
+//#define WEBRTC_TRACE(a,b,c,...)  __android_log_print(                  \
+//           ANDROID_LOG_DEBUG, "WebRTC ADM OpenSLES", __VA_ARGS__)
+//#endif
 
 namespace webrtc {
 
@@ -863,7 +864,7 @@ WebRtc_Word32 AudioDeviceAndroidOpenSLES::InitPlayout() {
     // Set arrays required[] and iidArray[] for SEEK interface
     // (PlayItf is implicit)
     ids[0] = SL_IID_BUFFERQUEUE;
-    ids[1] = SL_IID_EFFECTSEND;
+    ids[1] = SL_IID_ANDROIDCONFIGURATION;
     req[0] = SL_BOOLEAN_TRUE;
     req[1] = SL_BOOLEAN_TRUE;
     // Create the music player
@@ -874,6 +875,20 @@ WebRtc_Word32 AudioDeviceAndroidOpenSLES::InitPlayout() {
                      "  failed to create Audio Player");
         return -1;
     }
+
+    SLAndroidConfigurationItf playerConfig;
+    res = (*_slPlayer)->GetInterface(_slPlayer, SL_IID_ANDROIDCONFIGURATION,
+                                     &playerConfig);
+    if(res != SL_RESULT_SUCCESS){
+       WEBRTC_TRACE(kTraceError, kTraceAudioDevice, _id,
+                  "  failed to get configuration interface");
+        return -1;
+    }
+
+    SLint32 streamType = SL_ANDROID_STREAM_VOICE;
+    res = (*playerConfig)->SetConfiguration(playerConfig,
+                                            SL_ANDROID_KEY_STREAM_TYPE,
+                                            &streamType, sizeof(SLint32));
 
     // Realizing the player in synchronous mode.
     res = (*_slPlayer)->Realize(_slPlayer, SL_BOOLEAN_FALSE);
@@ -985,16 +1000,41 @@ WebRtc_Word32 AudioDeviceAndroidOpenSLES::InitRecording() {
     audioSink.pFormat = (void *) &pcm;
     audioSink.pLocator = (void *) &simpleBufferQueue;
 
-    const SLInterfaceID id[1] = { SL_IID_ANDROIDSIMPLEBUFFERQUEUE };
-    const SLboolean req[1] = { SL_BOOLEAN_TRUE };
+    const SLInterfaceID id[2] = { SL_IID_ANDROIDSIMPLEBUFFERQUEUE,
+                                 SL_IID_ANDROIDCONFIGURATION };
+
+    const SLboolean req[2] = { SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE };
     res = (*_slEngine)->CreateAudioRecorder(_slEngine, &_slRecorder,
-                                            &audioSource, &audioSink, 1, id,
+                                            &audioSource, &audioSink, 2, id,
                                             req);
     if (res != SL_RESULT_SUCCESS) {
         WEBRTC_TRACE(kTraceError, kTraceAudioDevice, _id,
                      "  failed to create Recorder");
         return -1;
     }
+
+    SLAndroidConfigurationItf recorderConfig;
+    res = (*_slRecorder)->GetInterface(_slRecorder, SL_IID_ANDROIDCONFIGURATION,
+                                       &recorderConfig);
+    if(res != SL_RESULT_SUCCESS){
+      WEBRTC_TRACE(kTraceError, kTraceAudioDevice, _id,
+                   "  failed to get config interface");
+       return -1;
+    }
+
+    SLint32 streamType = SL_ANDROID_RECORDING_PRESET_GENERIC;
+    char sdkVersion[PROP_VALUE_MAX];
+    __system_property_get("ro.build.version.sdk", sdkVersion);
+
+    if (atoi(sdkVersion) >= 10) {
+        //SL_ANDROID_RECORDING_PRESET_VOICE_RECOGNITION 0x00000003
+        //SL_ANDROID_RECORDING_PRESET_VOICE_COMMUNICATION 0x00000004
+        streamType = 0x7;
+    }
+
+    res = (*recorderConfig)->SetConfiguration(recorderConfig,
+                                            SL_ANDROID_KEY_RECORDING_PRESET,
+                                            &streamType, sizeof(SLint32));
 
     // Realizing the recorder in synchronous mode.
     res = (*_slRecorder)->Realize(_slRecorder, SL_BOOLEAN_FALSE);
@@ -1304,7 +1344,7 @@ WebRtc_Word32 AudioDeviceAndroidOpenSLES::StopPlayout() {
 
     if ((_slPlayerPlay != NULL) && (_slOutputMixObject == NULL) && (_slPlayer
             == NULL)) {
-        // Make sure player is stopped 
+        // Make sure player is stopped
         WebRtc_Word32 res =
                 (*_slPlayerPlay)->SetPlayState(_slPlayerPlay,
                                                SL_PLAYSTATE_STOPPED);
@@ -1322,7 +1362,7 @@ WebRtc_Word32 AudioDeviceAndroidOpenSLES::StopPlayout() {
 
         // Destroy the player
         (*_slPlayer)->Destroy(_slPlayer);
-        // Destroy Output Mix object 
+        // Destroy Output Mix object
         (*_slOutputMixObject)->Destroy(_slOutputMixObject);
         _slPlayer = NULL;
         _slPlayerPlay = NULL;
