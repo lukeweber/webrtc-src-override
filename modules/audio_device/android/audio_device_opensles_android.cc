@@ -22,11 +22,13 @@
 #include "thread_wrapper.h"
 #include "event_wrapper.h"
 
-//#ifdef WEBRTC_ANDROID_DEBUG
-//#include <android/log.h>
-//#define WEBRTC_TRACE(a,b,c,...)  __android_log_print(                  \
-//           ANDROID_LOG_DEBUG, "WebRTC ADM OpenSLES", __VA_ARGS__)
-//#endif
+/*
+#ifdef WEBRTC_ANDROID_DEBUG
+#include <android/log.h>
+#define WEBRTC_TRACE(a,b,c,...)  __android_log_print(                  \
+          ANDROID_LOG_DEBUG, "WebRTC ADM OpenSLES", __VA_ARGS__)
+#endif
+*/
 
 namespace webrtc {
 
