@@ -17,6 +17,7 @@
 #include "trace_win.h"
 #else
 #include <stdio.h>
+#include <time.h>
 #include <stdarg.h>
 #include "trace_posix.h"
 #endif // _WIN32
@@ -24,6 +25,10 @@
 #include "system_wrappers/interface/sleep.h"
 
 #define KEY_LEN_CHARS 31
+
+#ifdef WEBRTC_ANDROID_DEBUG
+#include <android/log.h>
+#endif
 
 #ifdef _WIN32
 #pragma warning(disable:4355)
@@ -603,7 +608,182 @@ void TraceImpl::AddImpl(const TraceLevel level, const TraceModule module,
                         const char msg[WEBRTC_TRACE_MAX_MESSAGE_SIZE])
 {
     if (TraceCheck(level))
-    {
+        {
+#ifdef WEBRTC_ANDROID_DEBUG
+          int prio;
+          char modulename[25];
+          switch (level)
+          {
+              case kTraceStateInfo:
+              case kTraceModuleCall:
+              case kTraceMemory:
+              case kTraceTimer:
+              case kTraceStream:
+              case kTraceApiCall:
+                  prio = ANDROID_LOG_INFO;
+                  break;
+              case kTraceWarning:
+                  prio = ANDROID_LOG_WARN;
+                  break;
+              case kTraceError:
+                  prio = ANDROID_LOG_ERROR;
+                  break;
+              case kTraceCritical:
+                  prio = ANDROID_LOG_ERROR;
+                  break;
+              case kTraceInfo:
+                  prio = ANDROID_LOG_DEBUG;
+                  break;
+              case kTraceDebug:
+                  prio = ANDROID_LOG_DEBUG;
+                  break;
+              default:
+                  assert(false);
+                  return;
+          }
+
+          // Use long int to prevent problems with different definitions of
+              // WebRtc_Word32.
+              // TODO (hellner): is this actually a problem? If so, it should be better to
+              //                 clean up WebRtc_Word32
+              const long int idl = id;
+              if(idl != -1)
+              {
+                  const unsigned long int idEngine = id>>16;
+                  const unsigned long int idChannel = id & 0xffff;
+
+                  switch (module)
+                  {
+                      case kTraceVoice:
+                          sprintf(modulename, "Voice:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                      case kTraceVideo:
+                          sprintf(modulename, "Video:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                      case kTraceUtility:
+                          sprintf(modulename, "Utility:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                      case kTraceRtpRtcp:
+                          sprintf(modulename, "Rtp/Rtcp:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                      case kTraceTransport:
+                          sprintf(modulename, "Transport:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                      case kTraceAudioCoding:
+                          sprintf(modulename, "AudioCoding:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                      case kTraceSrtp:
+                          sprintf(modulename, "Srtp:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                      case kTraceAudioMixerServer:
+                          sprintf(modulename, "Audio Mix/s:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                      case kTraceAudioMixerClient:
+                          sprintf(modulename, "Audio/c:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                      case kTraceVideoCoding:
+                          sprintf(modulename, "Video Coding:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                      case kTraceVideoMixer:
+                          // Print sleep time and API call
+                          sprintf(modulename, "Video Mix:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                      case kTraceFile:
+                          sprintf(modulename, "File:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                      case kTraceAudioProcessing:
+                          sprintf(modulename, "Audio Proc:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                      case kTraceAudioDevice:
+                          sprintf(modulename, "Audio Device:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                      case kTraceVideoRenderer:
+                          sprintf(modulename, "Video Renderer:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                      case kTraceVideoCapture:
+                          sprintf(modulename, "Video Capt:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                      case kTraceVideoPreocessing:
+                          sprintf(modulename, "Video Proc:%5ld %5ld;", idEngine,
+                                  idChannel);
+                          break;
+                  }
+              } else {
+                  switch (module)
+                  {
+                      case kTraceVoice:
+                          sprintf (modulename, "Voice:%11ld;", idl);
+                          break;
+                      case kTraceVideo:
+                          sprintf (modulename, "Video:%11ld;", idl);
+                          break;
+                      case kTraceUtility:
+                          sprintf (modulename, "Utility:%11ld;", idl);
+                          break;
+                      case kTraceRtpRtcp:
+                          sprintf (modulename, "Rtp/Rtcp:%11ld;", idl);
+                          break;
+                      case kTraceTransport:
+                          sprintf (modulename, "Transport:%11ld;", idl);
+                          break;
+                      case kTraceAudioCoding:
+                          sprintf (modulename, "Audio Coding:%11ld;", idl);
+                          break;
+                      case kTraceSrtp:
+                          sprintf (modulename, "Srtp:%11ld;", idl);
+                          break;
+                      case kTraceAudioMixerServer:
+                          sprintf (modulename, "Audio Mix/s:%11ld;", idl);
+                          break;
+                      case kTraceAudioMixerClient:
+                          sprintf (modulename, "Audio Mix/c:%11ld;", idl);
+                          break;
+                      case kTraceVideoCoding:
+                          sprintf (modulename, "Video Coding:%11ld;", idl);
+                          break;
+                      case kTraceVideoMixer:
+                          sprintf (modulename, "Video Mix:%11ld;", idl);
+                          break;
+                      case kTraceFile:
+                          sprintf (modulename, "File:%11ld;", idl);
+                          break;
+                      case kTraceAudioProcessing:
+                          sprintf (modulename, "Audio Proc:%11ld;", idl);
+                          break;
+                      case kTraceAudioDevice:
+                          sprintf (modulename, "Audio Device:%11ld;", idl);
+                          break;
+                      case kTraceVideoRenderer:
+                          sprintf (modulename, "Video Render:%11ld;", idl);
+                          break;
+                      case kTraceVideoCapture:
+                          sprintf (modulename, "Video Captur:%11ld;", idl);
+                          break;
+                      case kTraceVideoPreocessing:
+                          sprintf (modulename, "Video Proc:%11ld;", idl);
+                          break;
+                  }
+              }
+
+            __android_log_print(prio, modulename, msg);
+
+#else
         char traceMessage[WEBRTC_TRACE_MAX_MESSAGE_SIZE];
         char* meassagePtr = traceMessage;
 
@@ -652,6 +832,7 @@ void TraceImpl::AddImpl(const TraceLevel level, const TraceModule module,
 
         // Make sure that messages are written as soon as possible.
         _event.Set();
+#endif
     }
 }
 
