@@ -8,7 +8,9 @@
 
 LOCAL_PATH := $(call my-dir)
 
-MY_LIBS_PATH := ../../../../../../out/Debug/obj.target
+include $(call all-makefiles-under, $(LOCAL_PATH))
+
+MY_LIBS_PATH := ../../../../../out/Debug/obj.target
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := libvoice_engine_core
@@ -261,9 +263,9 @@ LOCAL_CFLAGS := \
 
 LOCAL_C_INCLUDES := \
     external/gtest/include \
-    $(LOCAL_PATH)/../../../../.. \
-    $(LOCAL_PATH)/../../../../include \
-    $(LOCAL_PATH)/../../../../../voice_engine/include
+    $(LOCAL_PATH)/../../../.. \
+    $(LOCAL_PATH)/../../../include \
+    $(LOCAL_PATH)/../../../../voice_engine/include
 
 LOCAL_LDLIBS := \
     -llog \
@@ -311,6 +313,7 @@ LOCAL_STATIC_LIBRARIES := \
     libjpeg_turbo \
     libaudioproc_debug_proto \
     libprotobuf_lite \
-    libvpx
+    libvpx \
+    $(MY_SUPPLEMENTAL_LIBS)
 
 include $(BUILD_SHARED_LIBRARY)

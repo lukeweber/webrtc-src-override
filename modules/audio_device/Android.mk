@@ -22,7 +22,7 @@ LOCAL_SRC_FILES := \
     audio_device_generic.cc \
     audio_device_utility.cc \
     audio_device_impl.cc \
-    android/audio_device_android_opensles.cc \
+    android/audio_device_opensles_android.cc \
     android/audio_device_utility_android.cc
     # dummy/audio_device_utility_dummy.cc \
     # dummy/audio_device_dummy.cc
