@@ -12,6 +12,7 @@
 
 #include <cassert>
 
+#include "common_video/libyuv/include/webrtc_libyuv.h"
 #include "modules/rtp_rtcp/interface/rtp_rtcp.h"
 #include "modules/utility/interface/process_thread.h"
 #include "modules/video_coding/codecs/interface/video_codec_interface.h"
@@ -72,6 +73,7 @@ ViEEncoder::ViEEncoder(WebRtc_Word32 engine_id,
     data_cs_(CriticalSectionWrapper::CreateCriticalSection()),
     bitrate_controller_(bitrate_controller),
     paused_(false),
+    time_last_intra_request_ms_(0),
     channels_dropping_delta_frames_(0),
     drop_next_frame_(false),
     fec_enabled_(false),
@@ -422,12 +424,12 @@ RtpRtcp* ViEEncoder::SendRtpRtcpModule() {
 }
 
 void ViEEncoder::DeliverFrame(int id,
-                              VideoFrame* video_frame,
+                              I420VideoFrame* video_frame,
                               int num_csrcs,
                               const WebRtc_UWord32 CSRC[kRtpCsrcSize]) {
   WEBRTC_TRACE(webrtc::kTraceStream, webrtc::kTraceVideo,
                ViEId(engine_id_, channel_id_), "%s: %llu", __FUNCTION__,
-               video_frame->TimeStamp());
+               video_frame->timestamp());
 
   {
     CriticalSectionScoped cs(data_cs_.get());
@@ -440,7 +442,7 @@ void ViEEncoder::DeliverFrame(int id,
       WEBRTC_TRACE(webrtc::kTraceStream, webrtc::kTraceVideo,
                    ViEId(engine_id_, channel_id_),
                    "%s: Dropping frame %llu after a key fame", __FUNCTION__,
-                   video_frame->TimeStamp());
+                   video_frame->timestamp());
       drop_next_frame_ = false;
       return;
     }
@@ -450,14 +452,19 @@ void ViEEncoder::DeliverFrame(int id,
   const int kMsToRtpTimestamp = 90;
   const WebRtc_UWord32 time_stamp =
       kMsToRtpTimestamp *
-      static_cast<WebRtc_UWord32>(video_frame->RenderTimeMs());
-  video_frame->SetTimeStamp(time_stamp);
+      static_cast<WebRtc_UWord32>(video_frame->render_time_ms());
+  video_frame->set_timestamp(time_stamp);
   {
     CriticalSectionScoped cs(callback_cs_.get());
     if (effect_filter_) {
-      effect_filter_->Transform(video_frame->Length(), video_frame->Buffer(),
-                                video_frame->TimeStamp(),
-                                video_frame->Width(), video_frame->Height());
+      unsigned int length = CalcBufferSize(kI420,
+                                           video_frame->width(),
+                                           video_frame->height());
+      scoped_array<uint8_t> video_buffer(new uint8_t[length]);
+      ExtractBuffer(*video_frame, length, video_buffer.get());
+      effect_filter_->Transform(length, video_buffer.get(),
+                                video_frame->timestamp(), video_frame->width(),
+                                video_frame->height());
     }
   }
   // Record raw frame.
@@ -494,7 +501,7 @@ void ViEEncoder::DeliverFrame(int id,
       has_received_sli_ = false;
       has_received_rpsi_ = false;
     }
-    VideoFrame* decimated_frame = NULL;
+    I420VideoFrame* decimated_frame = NULL;
     const int ret = vpm_.PreprocessFrame(*video_frame, &decimated_frame);
     if (ret == 1) {
       // Drop this frame.
@@ -503,7 +510,7 @@ void ViEEncoder::DeliverFrame(int id,
       WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
                    ViEId(engine_id_, channel_id_),
                    "%s: Error preprocessing frame %u", __FUNCTION__,
-                   video_frame->TimeStamp());
+                   video_frame->timestamp());
       return;
     }
 
@@ -520,14 +527,14 @@ void ViEEncoder::DeliverFrame(int id,
       WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
                    ViEId(engine_id_, channel_id_),
                    "%s: Error encoding frame %u", __FUNCTION__,
-                   video_frame->TimeStamp());
+                   video_frame->timestamp());
     }
     return;
   }
 #endif
   // TODO(mflodman) Rewrite this to use code common to VP8 case.
   // Pass frame via preprocessor.
-  VideoFrame* decimated_frame = NULL;
+  I420VideoFrame* decimated_frame = NULL;
   const int ret = vpm_.PreprocessFrame(*video_frame, &decimated_frame);
   if (ret == 1) {
     // Drop this frame.
@@ -536,7 +543,7 @@ void ViEEncoder::DeliverFrame(int id,
     WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
                  ViEId(engine_id_, channel_id_),
                  "%s: Error preprocessing frame %u", __FUNCTION__,
-                 video_frame->TimeStamp());
+                 video_frame->timestamp());
     return;
   }
 
@@ -547,7 +554,7 @@ void ViEEncoder::DeliverFrame(int id,
   if (vcm_.AddVideoFrame(*decimated_frame) != VCM_OK) {
     WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
                  ViEId(engine_id_, channel_id_), "%s: Error encoding frame %u",
-                 __FUNCTION__, video_frame->TimeStamp());
+                 __FUNCTION__, video_frame->timestamp());
   }
 }
 
@@ -805,79 +812,23 @@ void ViEEncoder::OnReceivedRPSI(uint32_t /*ssrc*/,
   has_received_rpsi_ = true;
 }
 
-void ViEEncoder::OnReceivedIntraFrameRequest(uint32_t ssrc) {
+void ViEEncoder::OnReceivedIntraFrameRequest(uint32_t /*ssrc*/) {
   // Key frame request from remote side, signal to VCM.
   WEBRTC_TRACE(webrtc::kTraceStateInfo, webrtc::kTraceVideo,
                ViEId(engine_id_, channel_id_), "%s", __FUNCTION__);
 
-  int idx = 0;
-  {
-    CriticalSectionScoped cs(data_cs_.get());
-    std::map<unsigned int, int>::iterator stream_it = ssrc_streams_.find(ssrc);
-    if (stream_it == ssrc_streams_.end()) {
-      assert(false);
-      return;
-    }
-    std::map<unsigned int, WebRtc_Word64>::iterator time_it =
-        time_last_intra_request_ms_.find(ssrc);
-    if (time_it == time_last_intra_request_ms_.end()) {
-      time_last_intra_request_ms_[ssrc] = 0;
-    }
-
-    WebRtc_Word64 now = TickTime::MillisecondTimestamp();
-    if (time_last_intra_request_ms_[ssrc] + kViEMinKeyRequestIntervalMs > now) {
-      WEBRTC_TRACE(webrtc::kTraceStream, webrtc::kTraceVideo,
-                   ViEId(engine_id_, channel_id_),
-                   "%s: Not encoding new intra due to timing", __FUNCTION__);
-      return;
-    }
-    time_last_intra_request_ms_[ssrc] = now;
-    idx = stream_it->second;
+  WebRtc_Word64 now = TickTime::MillisecondTimestamp();
+  if (time_last_intra_request_ms_ + kViEMinKeyRequestIntervalMs > now) {
+    WEBRTC_TRACE(webrtc::kTraceStream, webrtc::kTraceVideo,
+                 ViEId(engine_id_, channel_id_),
+                 "%s: Not not encoding new intra due to timing", __FUNCTION__);
+    return;
   }
-  // Release the critsect before triggering key frame.
-  vcm_.IntraFrameRequest(idx);
+  vcm_.IntraFrameRequest(0);
+  time_last_intra_request_ms_ = now;
 }
 
 void ViEEncoder::OnLocalSsrcChanged(uint32_t old_ssrc, uint32_t new_ssrc) {
-  CriticalSectionScoped cs(data_cs_.get());
-  std::map<unsigned int, int>::iterator it = ssrc_streams_.find(old_ssrc);
-  if (it == ssrc_streams_.end()) {
-    return;
-  }
-
-  ssrc_streams_[new_ssrc] = it->second;
-  ssrc_streams_.erase(it);
-
-  std::map<unsigned int, int64_t>::iterator time_it =
-      time_last_intra_request_ms_.find(old_ssrc);
-  int64_t last_intra_request_ms = 0;
-  if (time_it != time_last_intra_request_ms_.end()) {
-    last_intra_request_ms = time_it->second;
-    time_last_intra_request_ms_.erase(time_it);
-  }
-  time_last_intra_request_ms_[new_ssrc] = last_intra_request_ms;
-}
-
-bool ViEEncoder::SetSsrcs(const std::list<unsigned int>& ssrcs) {
-  VideoCodec codec;
-  if (vcm_.SendCodec(&codec) != 0)
-    return false;
-
-  if (codec.numberOfSimulcastStreams > 0 &&
-      ssrcs.size() != codec.numberOfSimulcastStreams) {
-    return false;
-  }
-
-  CriticalSectionScoped cs(data_cs_.get());
-  ssrc_streams_.clear();
-  time_last_intra_request_ms_.clear();
-  int idx = 0;
-  for (std::list<unsigned int>::const_iterator it = ssrcs.begin();
-       it != ssrcs.end(); ++it, ++idx) {
-    unsigned int ssrc = *it;
-    ssrc_streams_[ssrc] = idx;
-  }
-  return true;
 }
 
 // Called from ViEBitrateObserver.
