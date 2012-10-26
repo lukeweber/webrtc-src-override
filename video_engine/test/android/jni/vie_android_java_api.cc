@@ -215,7 +215,7 @@ public:
       _frameRateO(0), _bitRateO(0) {
     _callbackCls = _env->GetObjectClass(_callbackObj);
     _callbackId
-        = _env->GetMethodID(_callbackCls, "UpdateStats", "(IIIII)I");
+        = _env->GetMethodID(_callbackCls, "updateStats", "(IIIII)I");
     if (_callbackId == NULL) {
       __android_log_print(ANDROID_LOG_ERROR, WEBRTC_LOG_TAG,
                           "Failed to get jid");
@@ -974,14 +974,9 @@ JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_EnableNA
   if (NULL == vieData.rtp)
     return -1;
 
-  if (enable)
-    __android_log_write(ANDROID_LOG_DEBUG, WEBRTC_LOG_TAG,
-                            "EnableNACK enable");
-  else
-    __android_log_write(ANDROID_LOG_DEBUG, WEBRTC_LOG_TAG,
-                            "EnableNACK disable");
-
   int ret = vieData.rtp->SetNACKStatus(channel, enable);
+  __android_log_print(ANDROID_LOG_DEBUG, WEBRTC_LOG_TAG,
+                      "EnableNACK(%d) ret:%d", enable, ret);
   return ret;
 }
 

@@ -84,7 +84,7 @@ class ViEEncoder
 
   // Implementing ViEFrameCallback.
   virtual void DeliverFrame(int id,
-                            VideoFrame* video_frame,
+                            I420VideoFrame* video_frame,
                             int num_csrcs = 0,
                             const WebRtc_UWord32 CSRC[kRtpCsrcSize] = NULL);
   virtual void DelayChanged(int id, int frame_delay);
@@ -152,6 +152,7 @@ class ViEEncoder
   // Disables recording of debugging information.
   virtual int StopDebugRecording();
 
+  int channel_id() const { return channel_id_; }
  protected:
   // Called by BitrateObserver.
   void OnNetworkChanged(const uint32_t bitrate_bps,

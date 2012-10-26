@@ -24,7 +24,7 @@ enum PlaneType {
   kYPlane = 0,
   kUPlane = 1,
   kVPlane = 2,
-  KNumOfPlanes = 3
+  kNumOfPlanes = 3
 };
 
 class I420VideoFrame {
@@ -63,7 +63,7 @@ class I420VideoFrame {
   const uint8_t* buffer(PlaneType type) const;
 
   // Get allocated size per plane.
-  int size(PlaneType type) const;
+  int allocated_size(PlaneType type) const;
 
   // Get allocated stride per plane.
   int stride(PlaneType type) const;
@@ -92,6 +92,13 @@ class I420VideoFrame {
 
   // Get render time in miliseconds.
   int64_t render_time_ms() const {return render_time_ms_;}
+
+  // Return true if underlying plane buffers are of zero size, false if not.
+  bool IsZeroSize() const;
+
+  // Reset underlying plane buffers sizes to 0. This function doesn't
+  // clear memory.
+  void ResetSize();
 
  private:
   // Verifies legality of parameters.

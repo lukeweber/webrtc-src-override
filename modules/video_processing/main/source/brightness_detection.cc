@@ -41,26 +41,23 @@ VPMBrightnessDetection::Reset()
 }
 
 WebRtc_Word32
-VPMBrightnessDetection::ProcessFrame(const WebRtc_UWord8* frame,
-                                     const WebRtc_UWord32 width,
-                                     const WebRtc_UWord32 height,
-                                     const VideoProcessingModule::FrameStats& stats)
+VPMBrightnessDetection::ProcessFrame(const I420VideoFrame& frame,
+                                     const VideoProcessingModule::FrameStats&
+                                     stats)
 {
-    if (frame == NULL)
+    if (frame.IsZeroSize())
     {
-        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideoPreocessing, _id, "Null frame pointer");
+        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideoPreocessing, _id,
+                     "Null frame pointer");
         return VPM_PARAMETER_ERROR;
     }
-    
-    if (width == 0 || height == 0)
-    {
-        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideoPreocessing, _id, "Invalid frame size");
-        return VPM_PARAMETER_ERROR;
-    }
+    int width = frame.width();
+    int height = frame.height();
 
     if (!VideoProcessingModule::ValidFrameStats(stats))
     {
-        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideoPreocessing, _id, "Invalid frame stats");
+        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideoPreocessing, _id,
+                     "Invalid frame stats");
         return VPM_PARAMETER_ERROR;
     }
 
@@ -89,13 +86,15 @@ VPMBrightnessDetection::ProcessFrame(const WebRtc_UWord8* frame,
         if (stats.mean < 90 || stats.mean > 170)
         {
             // Standard deviation of Y
+            const uint8_t* buffer = frame.buffer(kYPlane);
             float stdY = 0;
-            for (WebRtc_UWord32 h = 0; h < height; h += (1 << stats.subSamplHeight))
+            for (int h = 0; h < height; h += (1 << stats.subSamplHeight))
             {
-                WebRtc_UWord32 row = h*width;
-                for (WebRtc_UWord32 w = 0; w < width; w += (1 << stats.subSamplWidth))
+                int row = h*width;
+                for (int w = 0; w < width; w += (1 << stats.subSamplWidth))
                 {
-                    stdY += (frame[w + row] - stats.mean) * (frame[w + row] - stats.mean);
+                    stdY += (buffer[w + row] - stats.mean) * (buffer[w + row] -
+                        stats.mean);
                 }
             }           
             stdY = sqrt(stdY / stats.numPixels);
@@ -133,7 +132,8 @@ VPMBrightnessDetection::ProcessFrame(const WebRtc_UWord8* frame,
             // Check if image is too dark
             if ((stdY < 55) && (perc05 < 50))
             { 
-                if (medianY < 60 || stats.mean < 80 ||  perc95 < 130 || propLow > 0.20)
+                if (medianY < 60 || stats.mean < 80 ||  perc95 < 130 ||
+                    propLow > 0.20)
                 {
                     _frameCntDark++;
                 }
@@ -150,7 +150,8 @@ VPMBrightnessDetection::ProcessFrame(const WebRtc_UWord8* frame,
             // Check if image is too bright
             if ((stdY < 52) && (perc95 > 200) && (medianY > 160))
             {
-                if (medianY > 185 || stats.mean > 185 || perc05 > 140 || propHigh > 0.25)
+                if (medianY > 185 || stats.mean > 185 || perc05 > 140 ||
+                    propHigh > 0.25)
                 {
                     _frameCntBright++;  
                 }

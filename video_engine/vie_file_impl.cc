@@ -14,6 +14,7 @@
 
 #ifdef WEBRTC_VIDEO_ENGINE_FILE_API
 #include "common_video/jpeg/include/jpeg.h"
+#include "common_video/libyuv/include/webrtc_libyuv.h"
 #include "system_wrappers/interface/condition_variable_wrapper.h"
 #include "system_wrappers/interface/critical_section_wrapper.h"
 #include "system_wrappers/interface/trace.h"
@@ -557,7 +558,7 @@ int ViEFileImpl::GetRenderSnapshot(const int video_channel,
     return -1;
   }
 
-  VideoFrame video_frame;
+  I420VideoFrame video_frame;
   if (renderer->GetLastRenderedFrame(video_channel, video_frame) == -1) {
     return -1;
   }
@@ -592,20 +593,23 @@ int ViEFileImpl::GetRenderSnapshot(const int video_channel,
     return -1;
   }
 
-  VideoFrame video_frame;
+  I420VideoFrame video_frame;
   if (renderer->GetLastRenderedFrame(video_channel, video_frame) == -1) {
     return -1;
   }
 
   // Copy from VideoFrame class to ViEPicture struct.
-  int buffer_length =
-      static_cast<int>(video_frame.Width() * video_frame.Height() * 1.5);
-  picture.data =  static_cast<WebRtc_UWord8*>(malloc(
+  int buffer_length = CalcBufferSize(kI420, video_frame.width(),
+                                     video_frame.height());
+  picture.data = static_cast<WebRtc_UWord8*>(malloc(
       buffer_length * sizeof(WebRtc_UWord8)));
-  memcpy(picture.data, video_frame.Buffer(), buffer_length);
+  if (ExtractBuffer(video_frame, buffer_length, picture.data) < 0) {
+    return -1;
+  }
+
   picture.size = buffer_length;
-  picture.width = video_frame.Width();
-  picture.height = video_frame.Height();
+  picture.width = video_frame.width();
+  picture.height = video_frame.height();
   picture.type = kVideoI420;
   return 0;
 }
@@ -618,7 +622,7 @@ int ViEFileImpl::GetCaptureDeviceSnapshot(const int capture_id,
     return -1;
   }
 
-  VideoFrame video_frame;
+  I420VideoFrame video_frame;
   if (GetNextCapturedFrame(capture_id, &video_frame) == -1) {
     WEBRTC_TRACE(kTraceError, kTraceVideo, shared_data_->instance_id(),
                  "Could not gain acces to capture device %d video frame "
@@ -649,7 +653,7 @@ int ViEFileImpl::GetCaptureDeviceSnapshot(const int capture_id,
 
 int ViEFileImpl::GetCaptureDeviceSnapshot(const int capture_id,
                                           ViEPicture& picture) {
-  VideoFrame video_frame;
+  I420VideoFrame video_frame;
   ViEInputManagerScoped is(*(shared_data_->input_manager()));
   ViECapturer* capturer = is.Capture(capture_id);
   if (!capturer) {
@@ -663,14 +667,16 @@ int ViEFileImpl::GetCaptureDeviceSnapshot(const int capture_id,
   }
 
   // Copy from VideoFrame class to ViEPicture struct.
-  int buffer_length =
-      static_cast<int>(video_frame.Width() * video_frame.Height() * 1.5);
+  int buffer_length = CalcBufferSize(kI420, video_frame.width(),
+                                     video_frame.height());
   picture.data = static_cast<WebRtc_UWord8*>(malloc(
       buffer_length * sizeof(WebRtc_UWord8)));
-  memcpy(picture.data, video_frame.Buffer(), buffer_length);
+  if (ExtractBuffer(video_frame, buffer_length, picture.data) < 0) {
+    return -1;
+  }
   picture.size = buffer_length;
-  picture.width = video_frame.Width();
-  picture.height = video_frame.Height();
+  picture.width = video_frame.width();
+  picture.height = video_frame.height();
   picture.type = kVideoI420;
   return 0;
 }
@@ -687,73 +693,6 @@ int ViEFileImpl::FreePicture(ViEPicture& picture) {  // NOLINT
   picture.type = kVideoUnknown;
   return 0;
 }
-int ViEFileImpl::SetCaptureDeviceImage(const int capture_id,
-                                       const char* file_nameUTF8) {
-  WEBRTC_TRACE(kTraceApiCall, kTraceVideo, shared_data_->instance_id(),
-               "%s(capture_id: %d)", __FUNCTION__, capture_id);
-
-  ViEInputManagerScoped is(*(shared_data_->input_manager()));
-  ViECapturer* capturer = is.Capture(capture_id);
-  if (!capturer) {
-    shared_data_->SetLastError(kViEFileInvalidCaptureId);
-    return -1;
-  }
-
-  VideoFrame capture_image;
-  if (ViEFileImage::ConvertJPEGToVideoFrame(
-          ViEId(shared_data_->instance_id(), capture_id), file_nameUTF8,
-          &capture_image) != 0) {
-    WEBRTC_TRACE(kTraceError, kTraceVideo,
-                 ViEId(shared_data_->instance_id(), capture_id),
-                 "%s(capture_id: %d) Failed to open file.", __FUNCTION__,
-                 capture_id);
-    shared_data_->SetLastError(kViEFileInvalidFile);
-    return -1;
-  }
-  if (capturer->SetCaptureDeviceImage(capture_image)) {
-    shared_data_->SetLastError(kViEFileSetCaptureImageError);
-    return -1;
-  }
-  return 0;
-}
-
-int ViEFileImpl::SetCaptureDeviceImage(const int capture_id,
-                                       const ViEPicture& picture) {
-  WEBRTC_TRACE(kTraceApiCall, kTraceVideo, shared_data_->instance_id(),
-               "%s(capture_id: %d)", __FUNCTION__, capture_id);
-
-  if (picture.type != kVideoI420) {
-    WEBRTC_TRACE(kTraceError, kTraceVideo,
-                 ViEId(shared_data_->instance_id(), capture_id),
-                 "%s(capture_id: %d) Not a valid picture type.",
-                 __FUNCTION__, capture_id);
-    shared_data_->SetLastError(kViEFileInvalidArgument);
-    return -1;
-  }
-  ViEInputManagerScoped is(*(shared_data_->input_manager()));
-  ViECapturer* capturer = is.Capture(capture_id);
-  if (!capturer) {
-    shared_data_->SetLastError(kViEFileSetCaptureImageError);
-    return -1;
-  }
-
-  VideoFrame capture_image;
-  if (ViEFileImage::ConvertPictureToVideoFrame(
-      ViEId(shared_data_->instance_id(), capture_id), picture,
-          &capture_image) != 0) {
-    WEBRTC_TRACE(kTraceError, kTraceVideo,
-                 ViEId(shared_data_->instance_id(), capture_id),
-                 "%s(capture_id: %d) Failed to use picture.", __FUNCTION__,
-                 capture_id);
-    shared_data_->SetLastError(kViEFileInvalidFile);
-    return -1;
-  }
-  if (capturer->SetCaptureDeviceImage(capture_image)) {
-    shared_data_->SetLastError(kViEFileInvalidCapture);
-    return -1;
-  }
-  return 0;
-}
 
 int ViEFileImpl::SetRenderStartImage(const int video_channel,
                                      const char* file_nameUTF8) {
@@ -768,7 +707,7 @@ int ViEFileImpl::SetRenderStartImage(const int video_channel,
     return -1;
   }
 
-  VideoFrame start_image;
+  I420VideoFrame start_image;
   if (ViEFileImage::ConvertJPEGToVideoFrame(
       ViEId(shared_data_->instance_id(), video_channel), file_nameUTF8,
           &start_image) != 0) {
@@ -807,8 +746,8 @@ int ViEFileImpl::SetRenderStartImage(const int video_channel,
     return -1;
   }
 
-  VideoFrame start_image;
-  if (ViEFileImage::ConvertPictureToVideoFrame(
+  I420VideoFrame start_image;
+  if (ViEFileImage::ConvertPictureToI420VideoFrame(
       ViEId(shared_data_->instance_id(), video_channel), picture,
           &start_image) != 0) {
     WEBRTC_TRACE(kTraceError, kTraceVideo,
@@ -837,7 +776,7 @@ int ViEFileImpl::SetRenderTimeoutImage(const int video_channel,
     shared_data_->SetLastError(kViEFileInvalidRenderId);
     return -1;
   }
-  VideoFrame timeout_image;
+  I420VideoFrame timeout_image;
   if (ViEFileImage::ConvertJPEGToVideoFrame(
           ViEId(shared_data_->instance_id(), video_channel), file_nameUTF8,
           &timeout_image) != 0) {
@@ -892,8 +831,8 @@ const unsigned int timeout_ms) {
     shared_data_->SetLastError(kViEFileSetRenderTimeoutError);
     return -1;
   }
-  VideoFrame timeout_image;
-  if (ViEFileImage::ConvertPictureToVideoFrame(
+  I420VideoFrame timeout_image;
+  if (ViEFileImage::ConvertPictureToI420VideoFrame(
           ViEId(shared_data_->instance_id(), video_channel), picture,
           &timeout_image) != 0) {
     WEBRTC_TRACE(kTraceError, kTraceVideo,
@@ -926,7 +865,7 @@ const unsigned int timeout_ms) {
 }
 
 WebRtc_Word32 ViEFileImpl::GetNextCapturedFrame(WebRtc_Word32 capture_id,
-                                                VideoFrame* video_frame) {
+                                                I420VideoFrame* video_frame) {
   ViEInputManagerScoped is(*(shared_data_->input_manager()));
   ViECapturer* capturer = is.Capture(capture_id);
   if (!capturer) {
@@ -988,12 +927,12 @@ ViECaptureSnapshot::~ViECaptureSnapshot() {
 }
 
 bool ViECaptureSnapshot::GetSnapshot(unsigned int max_wait_time,
-                                     VideoFrame* video_frame) {
+                                     I420VideoFrame* video_frame) {
   crit_->Enter();
-  video_frame_ = new VideoFrame();
+  video_frame_ = new I420VideoFrame();
   if (condition_varaible_->SleepCS(*(crit_.get()), max_wait_time)) {
     // Snapshot taken.
-    video_frame->SwapFrame(*video_frame_);
+    video_frame->SwapFrame(video_frame_);
     delete video_frame_;
     video_frame_ = NULL;
     crit_->Leave();
@@ -1004,14 +943,14 @@ bool ViECaptureSnapshot::GetSnapshot(unsigned int max_wait_time,
 }
 
 void ViECaptureSnapshot::DeliverFrame(int id,
-                                      VideoFrame* video_frame,
+                                      I420VideoFrame* video_frame,
                                       int num_csrcs,
 const WebRtc_UWord32 CSRC[kRtpCsrcSize]) {
   CriticalSectionScoped cs(crit_.get());
   if (!video_frame_) {
     return;
   }
-  video_frame_->SwapFrame(*video_frame);
+  video_frame_->SwapFrame(video_frame);
   condition_varaible_->WakeAll();
   return;
 }

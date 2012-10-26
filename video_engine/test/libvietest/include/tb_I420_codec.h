@@ -34,7 +34,7 @@ public:
                                      WebRtc_UWord32 maxPayloadSize);
 
     virtual WebRtc_Word32 Encode(
-        const webrtc::VideoFrame& inputImage,
+        const webrtc::I420VideoFrame& inputImage,
         const webrtc::CodecSpecificInfo* codecSpecificInfo,
         const std::vector<webrtc::VideoFrameType>* frameTypes);
 
@@ -47,8 +47,6 @@ public:
 
     virtual WebRtc_Word32 SetChannelParameters(WebRtc_UWord32 packetLoss,
                                                int rtt);
-
-    virtual WebRtc_Word32 SetPacketLoss(WebRtc_UWord32 packetLoss);
 
     virtual WebRtc_Word32 SetRates(WebRtc_UWord32 newBitRate,
                                    WebRtc_UWord32 frameRate);
@@ -65,8 +63,8 @@ public:
         WebRtc_Word32 RegisterEncodeCompleteCallback;
         WebRtc_Word32 Release;
         WebRtc_Word32 Reset;
+        WebRtc_Word32 SetChannelParameters;
         WebRtc_Word32 SetRates;
-        WebRtc_Word32 SetPacketLoss;
         WebRtc_Word32 SetPeriodicKeyFrames;
         WebRtc_Word32 CodecConfigParameters;
 
@@ -119,7 +117,7 @@ public:
 
 private:
 
-    webrtc::VideoFrame _decodedImage;
+    webrtc::I420VideoFrame _decodedImage;
     WebRtc_Word32 _width;
     WebRtc_Word32 _height;
     bool _inited;

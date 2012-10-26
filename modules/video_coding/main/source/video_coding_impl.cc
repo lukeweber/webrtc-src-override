@@ -9,6 +9,7 @@
  */
 
 #include "video_coding_impl.h"
+#include "common_video/libyuv/include/webrtc_libyuv.h"
 #include "common_types.h"
 #include "encoded_frame.h"
 #include "jitter_buffer.h"
@@ -652,7 +653,7 @@ VideoCodingModuleImpl::SetVideoProtection(VCMVideoProtection videoProtection,
 
 // Add one raw video frame to the encoder, blocking.
 WebRtc_Word32
-VideoCodingModuleImpl::AddVideoFrame(const VideoFrame& videoFrame,
+VideoCodingModuleImpl::AddVideoFrame(const I420VideoFrame& videoFrame,
                                      const VideoContentMetrics* contentMetrics,
                                      const CodecSpecificInfo* codecSpecificInfo)
 {
@@ -682,13 +683,13 @@ VideoCodingModuleImpl::AddVideoFrame(const VideoFrame& videoFrame,
         _mediaOpt.updateContentData(contentMetrics);
         WebRtc_Word32 ret = _encoder->Encode(videoFrame,
                                              codecSpecificInfo,
-                                             &_nextFrameTypes);
+                                             _nextFrameTypes);
         if (_encoderInputFile != NULL)
         {
-          if (fwrite(videoFrame.Buffer(), 1, videoFrame.Length(),
-                     _encoderInputFile) !=  videoFrame.Length()) {
-            return -1;
-          }
+            if (PrintI420VideoFrame(videoFrame, _encoderInputFile) < 0)
+            {
+                return -1;
+            }
         }
         if (ret < 0)
         {
@@ -706,13 +707,16 @@ VideoCodingModuleImpl::AddVideoFrame(const VideoFrame& videoFrame,
 }
 
 WebRtc_Word32 VideoCodingModuleImpl::IntraFrameRequest(int stream_index) {
-  assert(stream_index >= 0);
   CriticalSectionScoped cs(_sendCritSect);
+  if (stream_index < 0 ||
+      static_cast<unsigned int>(stream_index) >= _nextFrameTypes.size()) {
+    return -1;
+  }
   _nextFrameTypes[stream_index] = kVideoFrameKey;
   if (_encoder != NULL && _encoder->InternalSource()) {
     // Try to request the frame if we have an external encoder with
     // internal source since AddVideoFrame never will be called.
-    if (_encoder->RequestFrame(&_nextFrameTypes) ==
+    if (_encoder->RequestFrame(_nextFrameTypes) ==
         WEBRTC_VIDEO_CODEC_OK) {
       _nextFrameTypes[stream_index] = kVideoFrameDelta;
     }

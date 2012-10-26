@@ -32,7 +32,6 @@ VPMFramePreprocessor::~VPMFramePreprocessor()
     delete _spatialResampler;
     delete _ca;
     delete _vd;
-    _resampledFrame.Free(); // is this needed?
 }
 
 WebRtc_Word32
@@ -136,9 +135,10 @@ VPMFramePreprocessor::DecimatedHeight() const
 
 
 WebRtc_Word32
-VPMFramePreprocessor::PreprocessFrame(const VideoFrame* frame, VideoFrame** processedFrame)
+VPMFramePreprocessor::PreprocessFrame(const I420VideoFrame& frame,
+                                      I420VideoFrame** processedFrame)
 {
-    if (frame == NULL || frame->Height() == 0 || frame->Width() == 0)
+    if (frame.IsZeroSize())
     {
         return VPM_PARAMETER_ERROR;
     }
@@ -147,7 +147,8 @@ VPMFramePreprocessor::PreprocessFrame(const VideoFrame* frame, VideoFrame** proc
 
     if (_vd->DropFrame())
     {
-        WEBRTC_TRACE(webrtc::kTraceStream, webrtc::kTraceVideo, _id, "Drop frame due to frame rate");
+        WEBRTC_TRACE(webrtc::kTraceStream, webrtc::kTraceVideo, _id,
+                     "Drop frame due to frame rate");
         return 1;  // drop 1 frame
     }
 
@@ -155,8 +156,9 @@ VPMFramePreprocessor::PreprocessFrame(const VideoFrame* frame, VideoFrame** proc
     // Note that we must make a copy of it.
     // We are not allowed to resample the input frame.
     *processedFrame = NULL;
-    if (_spatialResampler->ApplyResample(frame->Width(), frame->Height()))  {
-      WebRtc_Word32 ret = _spatialResampler->ResampleFrame(*frame, _resampledFrame);
+    if (_spatialResampler->ApplyResample(frame.width(), frame.height()))  {
+      WebRtc_Word32 ret = _spatialResampler->ResampleFrame(frame,
+                                                           &_resampledFrame);
       if (ret != VPM_OK)
         return ret;
       *processedFrame = &_resampledFrame;
@@ -171,7 +173,7 @@ VPMFramePreprocessor::PreprocessFrame(const VideoFrame* frame, VideoFrame** proc
           if (*processedFrame == NULL)  {
             _contentMetrics = _ca->ComputeContentMetrics(frame);
           } else {
-            _contentMetrics = _ca->ComputeContentMetrics(&_resampledFrame);
+            _contentMetrics = _ca->ComputeContentMetrics(_resampledFrame);
           }
         }
         ++_frameCnt;

@@ -24,7 +24,7 @@ _codecType(kVideoCodecUnknown),
 _VCMencodedFrameCallback(NULL),
 _bitRate(0),
 _frameRate(0),
-_internalSource(false)
+_internalSource(internalSource)
 {
 }
 
@@ -57,14 +57,12 @@ VCMGenericEncoder::InitEncode(const VideoCodec* settings,
 }
 
 WebRtc_Word32
-VCMGenericEncoder::Encode(const VideoFrame& inputFrame,
+VCMGenericEncoder::Encode(const I420VideoFrame& inputFrame,
                           const CodecSpecificInfo* codecSpecificInfo,
-                          const std::vector<FrameType>* frameTypes) {
-  std::vector<VideoFrameType> video_frame_types(frameTypes->size(),
+                          const std::vector<FrameType>& frameTypes) {
+  std::vector<VideoFrameType> video_frame_types(frameTypes.size(),
                                                 kDeltaFrame);
-  if (frameTypes) {
-    VCMEncodedFrame::ConvertFrameTypes(*frameTypes, &video_frame_types);
-  }
+  VCMEncodedFrame::ConvertFrameTypes(frameTypes, &video_frame_types);
   return _encoder.Encode(inputFrame, codecSpecificInfo, &video_frame_types);
 }
 
@@ -115,15 +113,11 @@ VCMGenericEncoder::SetPeriodicKeyFrames(bool enable)
 }
 
 WebRtc_Word32 VCMGenericEncoder::RequestFrame(
-    const std::vector<FrameType>* frame_types) {
-  if (!frame_types) {
-    return 0;
-  }
-  VideoFrame image;
-  std::vector<VideoFrameType> video_frame_types(kVideoFrameDelta);
-  if (frame_types) {
-    VCMEncodedFrame::ConvertFrameTypes(*frame_types, &video_frame_types);
-  }
+    const std::vector<FrameType>& frame_types) {
+  I420VideoFrame image;
+  std::vector<VideoFrameType> video_frame_types(frame_types.size(),
+                                                kDeltaFrame);
+  VCMEncodedFrame::ConvertFrameTypes(frame_types, &video_frame_types);
   return _encoder.Encode(image, NULL, &video_frame_types);
 }
 

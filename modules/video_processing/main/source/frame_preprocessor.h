@@ -46,12 +46,15 @@ public:
     WebRtc_Word32 SetMaxFrameRate(WebRtc_UWord32 maxFrameRate);
 
     //Set target resolution: frame rate and dimension
-    WebRtc_Word32 SetTargetResolution(WebRtc_UWord32 width, WebRtc_UWord32 height, WebRtc_UWord32 frameRate);
+    WebRtc_Word32 SetTargetResolution(WebRtc_UWord32 width,
+                                      WebRtc_UWord32 height,
+                                      WebRtc_UWord32 frameRate);
 
     //Update incoming frame rate/dimension
     void UpdateIncomingFrameRate();
 
-    WebRtc_Word32 updateIncomingFrameSize(WebRtc_UWord32 width, WebRtc_UWord32 height);
+    WebRtc_Word32 updateIncomingFrameSize(WebRtc_UWord32 width,
+                                          WebRtc_UWord32 height);
 
     //Set decimated values: frame rate/dimension
     WebRtc_UWord32 DecimatedFrameRate();
@@ -59,7 +62,8 @@ public:
     WebRtc_UWord32 DecimatedHeight() const;
 
     //Preprocess output:
-    WebRtc_Word32 PreprocessFrame(const VideoFrame* frame, VideoFrame** processedFrame);
+    WebRtc_Word32 PreprocessFrame(const I420VideoFrame& frame,
+                                  I420VideoFrame** processedFrame);
     VideoContentMetrics* ContentMetrics() const;
 
 private:
@@ -70,7 +74,7 @@ private:
     WebRtc_Word32              _id;
     VideoContentMetrics*      _contentMetrics;
     WebRtc_UWord32             _maxFrameRate;
-    VideoFrame                _resampledFrame;
+    I420VideoFrame           _resampledFrame;
     VPMSpatialResampler*     _spatialResampler;
     VPMContentAnalysis*      _ca;
     VPMVideoDecimator*       _vd;

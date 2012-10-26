@@ -134,7 +134,7 @@ void ViEAutoTest::ViEFileStandardTest()
         webrtc::CodecInst audioCodec2;
 
         //***************************************************************
-        //	Engine ready. Begin testing class
+        // Engine ready. Begin testing class
         //***************************************************************
 
         // Call started
@@ -147,7 +147,7 @@ void ViEAutoTest::ViEFileStandardTest()
         const int VIDEO_LENGTH = 5000;
 
         const std::string root = webrtc::test::ProjectRootPath() +
-            "src/video_engine/test/auto_test/media/";
+            "webrtc/video_engine/test/auto_test/media/";
         const std::string renderStartImage = root + "renderStartImage.jpg";
         const std::string captureDeviceImage = root + "captureDeviceImage.jpg";
         const std::string renderTimeoutFile = root + "renderTimeoutImage.jpg";
@@ -327,37 +327,6 @@ void ViEAutoTest::ViEFileStandardTest()
                 captureId, snapshotCaptureDeviceFileName.c_str()));
             ViETest::Log("Wrote image to file %s",
                          snapshotCaptureDeviceFileName.c_str());
-            ViETest::Log("Done\n");
-        }
-
-        AutoTestSleep(TEST_SPACING);
-
-        // Testing: SetCaptureDeviceImage
-        {
-            ViETest::Log("Testing SetCaptureDeviceImage(int, char*)");
-            EXPECT_EQ(0, ptrViECapture->StopCapture(captureId));
-            EXPECT_EQ(0, ptrViEFile->SetCaptureDeviceImage(
-                captureId, captureDeviceImage.c_str()));
-
-            ViETest::Log("you should see the capture device image now");
-            AutoTestSleep(2 * RENDER_TIMEOUT);
-            EXPECT_EQ(0, ptrViECapture->StartCapture(captureId));
-            ViETest::Log("Done\n");
-        }
-
-        AutoTestSleep(TEST_SPACING);
-
-        // Testing: SetCaptureDeviceImage
-        if (FLAGS_include_timing_dependent_tests)
-        {
-            ViETest::Log("Testing SetCaptureDeviceImage(int, ViEPicture)");
-            EXPECT_EQ(0, ptrViECapture->StopCapture(captureId));
-            EXPECT_EQ(0, ptrViEFile->SetCaptureDeviceImage(
-                captureId, capturePicture));
-
-            ViETest::Log("you should see the capture device image now");
-            AutoTestSleep(2 * RENDER_TIMEOUT);
-            EXPECT_EQ(0, ptrViECapture->StartCapture(captureId));
             ViETest::Log("Done\n");
         }
 

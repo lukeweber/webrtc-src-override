@@ -21,7 +21,7 @@ public:
     PacketLossTest();
     virtual ~PacketLossTest() {if(_lastFrame) {delete [] _lastFrame; _lastFrame = NULL;}}
     virtual void Encoded(const webrtc::EncodedImage& encodedImage);
-    virtual void Decoded(const webrtc::VideoFrame& decodedImage);
+    virtual void Decoded(const webrtc::I420VideoFrame& decodedImage);
 protected:
     PacketLossTest(std::string name, std::string description);
     PacketLossTest(std::string name,
@@ -36,7 +36,8 @@ protected:
     virtual int DoPacketLoss();
     virtual int NextPacket(int size, unsigned char **pkg);
     virtual int ByteLoss(int size, unsigned char *pkg, int bytesToLose);
-    virtual void InsertPacket(TestVideoEncodedBuffer *buf, unsigned char *pkg, int size);
+    virtual void InsertPacket(webrtc::VideoFrame *buf, unsigned char *pkg,
+                              int size);
     int _inBufIdx;
     int _outBufIdx;
 

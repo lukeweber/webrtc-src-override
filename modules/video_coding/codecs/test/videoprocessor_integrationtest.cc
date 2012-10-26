@@ -156,7 +156,8 @@ class VideoProcessorIntegrationTest: public testing::Test {
         webrtc::test::ResourcePath("foreman_cif", "yuv");
     config_.output_filename = webrtc::test::OutputPath() +
           "foreman_cif_short_video_codecs_test_framework_integrationtests.yuv";
-    config_.frame_length_in_bytes = 3 * kCIFWidth * kCIFHeight / 2;
+    config_.frame_length_in_bytes = CalcBufferSize(kI420,
+                                                   kCIFWidth, kCIFHeight);
     config_.verbose = false;
     // Only allow encoder/decoder to use single core, for predictability.
     config_.use_single_core = true;
@@ -564,7 +565,7 @@ TEST_F(VideoProcessorIntegrationTest, ProcessZeroPacketLoss) {
   SetCodecParameters(&process_settings, 0.0f, -1, 1, true, true, true, false);
   // Metrics for expected quality.
   QualityMetrics quality_metrics;
-  SetQualityMetrics(&quality_metrics, 37.0, 33.0, 0.90, 0.90);
+  SetQualityMetrics(&quality_metrics, 36.95, 33.0, 0.90, 0.90);
   // Metrics for rate control.
   RateControlMetrics rc_metrics[1];
   SetRateControlMetrics(rc_metrics, 0, 0, 40, 20, 10, 15, 0);

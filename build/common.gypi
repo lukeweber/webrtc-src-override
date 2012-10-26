@@ -32,10 +32,20 @@
       'webrtc_root%': '<(webrtc_root)',
 
       'webrtc_vp8_dir%': '<(webrtc_root)/modules/video_coding/codecs/vp8',
+
+      # Enable opus for Chrome only right now.
+      'conditions': [
+        ['build_with_chromium==1', {
+          'include_opus%': 1,
+        }, {
+          'include_opus%': 0,
+        }],
+      ],
     },
     'build_with_chromium%': '<(build_with_chromium)',
     'webrtc_root%': '<(webrtc_root)',
     'webrtc_vp8_dir%': '<(webrtc_vp8_dir)',
+    'include_opus%': '<(include_opus)',
 
     # The Chromium common.gypi we use treats all gyp files without
     # chromium_code==1 as third party code. This disables many of the
@@ -62,6 +72,9 @@
     'build_libyuv%': 1,
     'build_libvpx%': 1,
 
+    # Enable to use the Mozilla internal settings.
+    'build_with_mozilla%': 0,
+
     'libyuv_dir%': '<(DEPTH)/third_party/libyuv',
 
     'conditions': [
@@ -85,6 +98,7 @@
 
         # Disable the use of protocol buffers in production code.
         'enable_protobuf%': 0,
+
       }, {  # Settings for the standalone (not-in-Chromium) build.
         'include_pulse_audio%': 1,
         'include_internal_audio_device%': 1,
@@ -118,8 +132,9 @@
   },
   'target_defaults': {
     'include_dirs': [
-      # TODO(andrew): we should be able to just use <(webrtc_root) here.
-      '..','../..',
+      # TODO(andrew): Remove '..' when we've added webrtc/ to include paths.
+      '..',
+      '../..',
     ],
     'defines': [
       # TODO(leozwang): Run this as a gclient hook rather than at build-time:
@@ -128,6 +143,12 @@
       #'WEBRTC_SVNREVISION="<!(python <(webrtc_root)/build/version.py)"',
     ],
     'conditions': [
+      ['build_with_mozilla==1', {
+        'defines': [
+          # Changes settings for Mozilla build.
+          'WEBRTC_MOZILLA_BUILD',
+         ],
+      }],
       ['build_with_chromium==1', {
         'defines': [
           # Changes settings for Chromium build.

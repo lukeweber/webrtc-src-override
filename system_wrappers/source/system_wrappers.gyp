@@ -228,7 +228,7 @@
             }, {
               'sources!': [ 'data_log_unittest.cc', ],
             }],
-            ['os_posix!=1', {
+            ['os_posix==0', {
               'sources!': [ 'thread_posix_unittest.cc', ],
             }],
           ],

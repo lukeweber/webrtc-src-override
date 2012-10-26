@@ -33,8 +33,10 @@
     'video_render/main/source/video_render.gypi',
     'rtp_rtcp/source/rtp_rtcp.gypi',
   ],
-
   'conditions': [
+    ['include_opus==1', {
+      'includes': ['audio_coding/codecs/opus/opus.gypi',],
+    }],
     ['include_tests==1', {
       'includes': [
         'audio_coding/codecs/isac/isac_test.gypi',

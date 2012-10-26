@@ -25,7 +25,7 @@ namespace webrtc {
 
 int ViEFileImage::ConvertJPEGToVideoFrame(int engine_id,
                                           const char* file_nameUTF8,
-                                          VideoFrame* video_frame) {
+                                          I420VideoFrame* video_frame) {
   // Read jpeg file into temporary buffer.
   EncodedImage image_buffer;
 
@@ -69,8 +69,7 @@ int ViEFileImage::ConvertJPEGToVideoFrame(int engine_id,
   }
   fclose(image_file);
 
-  JpegDecoder decoder;
-  int ret = decoder.Decode(image_buffer, *video_frame);
+  int ret = ConvertJpegToI420(image_buffer, video_frame);
 
   delete [] image_buffer._buffer;
   image_buffer._buffer = NULL;
@@ -88,15 +87,19 @@ int ViEFileImage::ConvertJPEGToVideoFrame(int engine_id,
   return 0;
 }
 
-int ViEFileImage::ConvertPictureToVideoFrame(int engine_id,
-                                             const ViEPicture& picture,
-                                             VideoFrame* video_frame) {
-  WebRtc_UWord32 picture_length = (WebRtc_UWord32)(picture.width *
-                                                   picture.height * 1.5);
-  video_frame->CopyFrame(picture_length, picture.data);
-  video_frame->SetWidth(picture.width);
-  video_frame->SetHeight(picture.height);
-  video_frame->SetLength(picture_length);
+int ViEFileImage::ConvertPictureToI420VideoFrame(int engine_id,
+                                                 const ViEPicture& picture,
+                                                 I420VideoFrame* video_frame) {
+  int half_width = (picture.width + 1) / 2;
+  int half_height = (picture.height + 1) / 2;
+  int size_uv = half_width * half_height;
+  int size_y = picture.width * picture.height;
+  return video_frame->CreateFrame(size_y, picture.data,
+                                  size_uv, picture.data + size_y,
+                                  size_uv, picture.data + size_y +
+                                  size_uv,
+                                  picture.width, picture.height,
+                                  picture.width, half_width, half_width);
   return 0;
 }
 

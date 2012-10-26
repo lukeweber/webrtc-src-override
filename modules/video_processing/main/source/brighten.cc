@@ -17,21 +17,21 @@
 namespace webrtc {
 namespace VideoProcessing {
 
-WebRtc_Word32 Brighten(WebRtc_UWord8* frame,
-                       int width, int height, int delta) {
-  if (frame == NULL) {
+WebRtc_Word32 Brighten(I420VideoFrame* frame, int delta) {
+  assert(frame);
+  if (frame->IsZeroSize()) {
     WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideoPreocessing, -1,
-                 "Null frame pointer");
+                 "zero size frame");
     return VPM_PARAMETER_ERROR;
   }
 
-  if (width <= 0 || height <= 0) {
+  if (frame->width() <= 0 || frame->height() <= 0) {
     WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideoPreocessing, -1,
                  "Invalid frame size");
     return VPM_PARAMETER_ERROR;
   }
 
-  int numPixels = width * height;
+  int numPixels = frame->width() * frame->height();
 
   int lookUp[256];
   for (int i = 0; i < 256; i++) {
@@ -39,7 +39,7 @@ WebRtc_Word32 Brighten(WebRtc_UWord8* frame,
     lookUp[i] = ((((val < 0) ? 0 : val) > 255) ? 255 : val);
   }
 
-  WebRtc_UWord8* tempPtr = frame;
+  WebRtc_UWord8* tempPtr = frame->buffer(kYPlane);
 
   for (int i = 0; i < numPixels; i++) {
     *tempPtr = static_cast<WebRtc_UWord8>(lookUp[*tempPtr]);

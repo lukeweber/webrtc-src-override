@@ -202,8 +202,8 @@ TransmitMixer::TransmitMixer(const WebRtc_UWord32 instanceId) :
     _instanceId(instanceId),
     _mixFileWithMicrophone(false),
     _captureLevel(0),
-    _externalMedia(false),
-    _externalMediaCallbackPtr(NULL),
+    external_postproc_ptr_(NULL),
+    external_preproc_ptr_(NULL),
     _mute(false),
     _remainingMuteMicTimeMs(0),
     _mixingFrequency(0),
@@ -223,10 +223,8 @@ TransmitMixer::~TransmitMixer()
     {
         _processThreadPtr->DeRegisterModule(&_monitorModule);
     }
-    if (_externalMedia)
-    {
-        DeRegisterExternalMediaProcessing();
-    }
+    DeRegisterExternalMediaProcessing(kRecordingAllChannelsMixed);
+    DeRegisterExternalMediaProcessing(kRecordingPreprocessing);
     {
         CriticalSectionScoped cs(&_critSect);
         if (_fileRecorderPtr)
@@ -322,8 +320,14 @@ void TransmitMixer::CheckForSendCodecChanges() {
 
       if (codec.channels == 2)
         stereo_codec_ = true;
-      if (codec.plfreq > _mixingFrequency)
+
+      // TODO(tlegrand): Remove once we have full 48 kHz support in
+      // Audio Coding Module.
+      if (codec.plfreq > 32000) {
+        _mixingFrequency = 32000;
+      } else if (codec.plfreq > _mixingFrequency) {
         _mixingFrequency = codec.plfreq;
+      }
     }
     channel = sc.GetNextChannel(iterator);
   }
@@ -354,6 +358,17 @@ TransmitMixer::PrepareDemux(const void* audioSamples,
                            samplesPerSec) == -1)
     {
         return -1;
+    }
+
+    {
+      CriticalSectionScoped cs(&_callbackCritSect);
+      if (external_preproc_ptr_) {
+        external_preproc_ptr_->Process(-1, kRecordingPreprocessing,
+                                       _audioFrame.data_,
+                                       _audioFrame.samples_per_channel_,
+                                       _audioFrame.sample_rate_hz_,
+                                       _audioFrame.num_channels_ == 2);
+      }
     }
 
     // --- Near-end Voice Quality Enhancement (APM) processing
@@ -407,22 +422,15 @@ TransmitMixer::PrepareDemux(const void* audioSamples,
         RecordAudioToFile(_mixingFrequency);
     }
 
-    // --- External media processing
-
-    if (_externalMedia)
     {
-        CriticalSectionScoped cs(&_callbackCritSect);
-        const bool isStereo = (_audioFrame.num_channels_ == 2);
-        if (_externalMediaCallbackPtr)
-        {
-            _externalMediaCallbackPtr->Process(
-                -1,
-                kRecordingAllChannelsMixed,
-                (WebRtc_Word16*) _audioFrame.data_,
-                _audioFrame.samples_per_channel_,
-                _audioFrame.sample_rate_hz_,
-                isStereo);
-        }
+      CriticalSectionScoped cs(&_callbackCritSect);
+      if (external_postproc_ptr_) {
+        external_postproc_ptr_->Process(-1, kRecordingAllChannelsMixed,
+                                        _audioFrame.data_,
+                                        _audioFrame.samples_per_channel_,
+                                        _audioFrame.sample_rate_hz_,
+                                        _audioFrame.num_channels_ == 2);
+      }
     }
 
     return 0;
@@ -1089,28 +1097,40 @@ TransmitMixer::SetMixWithMicStatus(bool mix)
 }
 
 int TransmitMixer::RegisterExternalMediaProcessing(
-    VoEMediaProcess& proccess_object)
-{
-    WEBRTC_TRACE(kTraceInfo, kTraceVoice, VoEId(_instanceId, -1),
-                 "TransmitMixer::RegisterExternalMediaProcessing()");
+    VoEMediaProcess* object,
+    ProcessingTypes type) {
+  WEBRTC_TRACE(kTraceInfo, kTraceVoice, VoEId(_instanceId, -1),
+               "TransmitMixer::RegisterExternalMediaProcessing()");
 
-    CriticalSectionScoped cs(&_callbackCritSect);
-    _externalMediaCallbackPtr = &proccess_object;
-    _externalMedia = true;
+  CriticalSectionScoped cs(&_callbackCritSect);
+  if (!object) {
+    return -1;
+  }
 
-    return 0;
+  // Store the callback object according to the processing type.
+  if (type == kRecordingAllChannelsMixed) {
+    external_postproc_ptr_ = object;
+  } else if (type == kRecordingPreprocessing) {
+    external_preproc_ptr_ = object;
+  } else {
+    return -1;
+  }
+  return 0;
 }
 
-int TransmitMixer::DeRegisterExternalMediaProcessing()
-{
-    WEBRTC_TRACE(kTraceInfo, kTraceVoice, VoEId(_instanceId, -1),
-                 "TransmitMixer::DeRegisterExternalMediaProcessing()");
+int TransmitMixer::DeRegisterExternalMediaProcessing(ProcessingTypes type) {
+  WEBRTC_TRACE(kTraceInfo, kTraceVoice, VoEId(_instanceId, -1),
+               "TransmitMixer::DeRegisterExternalMediaProcessing()");
 
-    CriticalSectionScoped cs(&_callbackCritSect);
-    _externalMedia = false;
-    _externalMediaCallbackPtr = NULL;
-
-    return 0;
+  CriticalSectionScoped cs(&_callbackCritSect);
+  if (type == kRecordingAllChannelsMixed) {
+    external_postproc_ptr_ = NULL;
+  } else if (type == kRecordingPreprocessing) {
+    external_preproc_ptr_ = NULL;
+  } else {
+    return -1;
+  }
+  return 0;
 }
 
 int
