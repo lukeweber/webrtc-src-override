@@ -15,6 +15,7 @@
 #endif
 #include <sys/resource.h>
 #include <sys/syscall.h>
+#include <sys/system_properties.h>
 #include <sys/time.h>
 #include <time.h>
 
@@ -737,6 +738,20 @@ WebRtc_Word32 AudioDeviceAndroidOpenSLES::InitPlayout() {
     return -1;
   }
 
+  SLAndroidConfigurationItf playerConfig;
+  res = (*sles_player_)->GetInterface(sles_player_, SL_IID_ANDROIDCONFIGURATION,
+      &playerConfig);
+  if(res != SL_RESULT_SUCCESS){
+    WEBRTC_TRACE(kTraceError, kTraceAudioDevice, id_,
+        "  failed to get configuration interface");
+    return -1;
+  }
+
+  SLint32 streamType = SL_ANDROID_STREAM_VOICE;
+  res = (*playerConfig)->SetConfiguration(playerConfig,
+      SL_ANDROID_KEY_STREAM_TYPE,
+      &streamType, sizeof(SLint32));
+
   // Realizing the player in synchronous mode.
   res = (*sles_player_)->Realize(sles_player_, SL_BOOLEAN_FALSE);
   if (res != SL_RESULT_SUCCESS) {
@@ -861,6 +876,28 @@ WebRtc_Word32 AudioDeviceAndroidOpenSLES::InitRecording() {
                         "  failed to create Recorder");
     return -1;
   }
+
+  SLAndroidConfigurationItf recorderConfig;
+  res = (*sles_recorder_)->GetInterface(sles_recorder_, SL_IID_ANDROIDCONFIGURATION,
+      &recorderConfig);
+  if(res != SL_RESULT_SUCCESS){
+    WEBRTC_TRACE(kTraceError, kTraceAudioDevice, id_,
+        "  failed to get config interface");
+    return -1;
+  }
+
+  SLint32 streamType = SL_ANDROID_RECORDING_PRESET_GENERIC;
+  char sdkVersion[PROP_VALUE_MAX];
+  __system_property_get("ro.build.version.sdk", sdkVersion);
+
+  if (atoi(sdkVersion) >= 10) {
+    //SL_ANDROID_RECORDING_PRESET_VOICE_COMMUNICATION 0x00000004
+    streamType = 0x4;
+  }
+
+  res = (*recorderConfig)->SetConfiguration(recorderConfig,
+      SL_ANDROID_KEY_RECORDING_PRESET,
+      &streamType, sizeof(SLint32));
 
   // Realizing the recorder in synchronous mode.
   res = (*sles_recorder_)->Realize(sles_recorder_, SL_BOOLEAN_FALSE);
