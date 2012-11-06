@@ -890,9 +890,8 @@ WebRtc_Word32 AudioDeviceAndroidOpenSLES::InitRecording() {
   char sdkVersion[PROP_VALUE_MAX];
   __system_property_get("ro.build.version.sdk", sdkVersion);
 
-  if (atoi(sdkVersion) >= 10) {
-    //SL_ANDROID_RECORDING_PRESET_VOICE_COMMUNICATION 0x00000004
-    streamType = 0x4;
+  if (atoi(sdkVersion) >= 14) {
+    streamType = 0x4;//SL_ANDROID_RECORDING_PRESET_VOICE_COMMUNICATION
   }
 
   res = (*recorderConfig)->SetConfiguration(recorderConfig,
