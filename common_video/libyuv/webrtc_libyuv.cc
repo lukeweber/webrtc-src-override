@@ -17,6 +17,8 @@
 
 namespace webrtc {
 
+const int k16ByteAlignment = 16;
+
 VideoType RawVideoTypeToCommonVideoVideoType(RawVideoType type) {
   switch (type) {
     case kVideoI420:
@@ -56,6 +58,11 @@ VideoType RawVideoTypeToCommonVideoVideoType(RawVideoType type) {
 int AlignInt(int value, int alignment) {
   assert(!((alignment - 1) & alignment));
   return ((value + alignment - 1) & ~ (alignment - 1));
+}
+
+void Calc16ByteAlignedStride(int width, int* stride_y, int* stride_uv) {
+  *stride_y = AlignInt(width, k16ByteAlignment);
+  *stride_uv = AlignInt((width + 1) / 2, k16ByteAlignment);
 }
 
 int CalcBufferSize(VideoType type, int width, int height) {
@@ -225,6 +232,14 @@ int ConvertToI420(VideoType src_video_type,
                   int sample_size,
                   VideoRotationMode rotation,
                   I420VideoFrame* dst_frame) {
+  int dst_width = dst_frame->width();
+  int dst_height = dst_frame->height();
+  // LibYuv expects pre-rotation values for dst.
+  // Stride values should correspond to the destination values.
+  if (rotation == kRotate90 || rotation == kRotate270) {
+    dst_width = dst_frame->height();
+    dst_height =dst_frame->width();
+  }
   return libyuv::ConvertToI420(src_frame, sample_size,
                                dst_frame->buffer(kYPlane),
                                dst_frame->stride(kYPlane),
@@ -234,7 +249,7 @@ int ConvertToI420(VideoType src_video_type,
                                dst_frame->stride(kVPlane),
                                crop_x, crop_y,
                                src_width, src_height,
-                               dst_frame->width(), dst_frame->height(),
+                               dst_width, dst_height,
                                ConvertRotationMode(rotation),
                                ConvertVideoType(src_video_type));
 }

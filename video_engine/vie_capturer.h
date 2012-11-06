@@ -15,7 +15,7 @@
 
 #include "common_types.h"  // NOLINT
 #include "engine_configurations.h"  // NOLINT
-#include "modules/video_capture/main/interface/video_capture.h"
+#include "webrtc/modules/video_capture/include/video_capture.h"
 #include "modules/video_coding/codecs/interface/video_codec_interface.h"
 #include "modules/video_coding/main/interface/video_coding.h"
 #include "modules/video_processing/main/interface/video_processing.h"
@@ -116,11 +116,9 @@ class ViECapturer
 
   // Implements VideoCaptureDataCallback.
   virtual void OnIncomingCapturedFrame(const WebRtc_Word32 id,
-                                       I420VideoFrame& video_frame,
-                                       VideoCodecType codec_type);
+                                       I420VideoFrame& video_frame);
   virtual void OnIncomingCapturedEncodedFrame(const WebRtc_Word32 capture_id,
-                                              VideoFrame& video_frame,
-                                              VideoCodecType codec_type);
+                                              VideoFrame& video_frame);
   virtual void OnCaptureDelayChanged(const WebRtc_Word32 id,
                                      const WebRtc_Word32 delay);
 
