@@ -33,16 +33,23 @@ LOCAL_SRC_FILES := \
     list_no_stl.cc \
     rw_lock.cc \
     thread.cc \
-    trace_impl.cc \
     condition_variable_posix.cc \
     cpu_linux.cc \
     critical_section_posix.cc \
     event_posix.cc \
     sleep.cc \
     thread_posix.cc \
-    trace_posix.cc \
     rw_lock_posix.cc \
     ../../../../voice-client-core/jni/tuenti/threadpriorityhandler.cc
+
+ifeq ($(ENABLE_WEBRTC_TRACE), 1)
+	LOCAL_SRC_FILES += \
+		trace_impl.cc \
+		trace_posix.cc
+else
+	LOCAL_SRC_FILES += \
+		trace_impl_no_op.cc
+endif
 
 LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
