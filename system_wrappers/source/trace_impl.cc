@@ -611,7 +611,9 @@ void TraceImpl::AddImpl(const TraceLevel level, const TraceModule module,
         {
 #ifdef WEBRTC_ANDROID_DEBUG
           int prio;
-          char modulename[25];
+          const size_t modulenamesize = 25;
+          char modulename[modulenamesize];
+          memset(modulename, 0, sizeof(char)*modulenamesize);
           switch (level)
           {
               case kTraceStateInfo:
@@ -655,72 +657,72 @@ void TraceImpl::AddImpl(const TraceLevel level, const TraceModule module,
                   switch (module)
                   {
                       case kTraceVoice:
-                          sprintf(modulename, "Voice:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "Voice:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                       case kTraceVideo:
-                          sprintf(modulename, "Video:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "Video:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                       case kTraceUtility:
-                          sprintf(modulename, "Utility:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "Utility:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                       case kTraceRtpRtcp:
-                          sprintf(modulename, "Rtp/Rtcp:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "Rtp/Rtcp:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                       case kTraceTransport:
-                          sprintf(modulename, "Transport:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "Transport:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                       case kTraceAudioCoding:
-                          sprintf(modulename, "AudioCoding:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "AudioCoding:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                       case kTraceSrtp:
-                          sprintf(modulename, "Srtp:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "Srtp:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                       case kTraceAudioMixerServer:
-                          sprintf(modulename, "Audio Mix/s:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "Audio Mix/s:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                       case kTraceAudioMixerClient:
-                          sprintf(modulename, "Audio/c:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "Audio/c:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                       case kTraceVideoCoding:
-                          sprintf(modulename, "Video Coding:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "Video Coding:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                       case kTraceVideoMixer:
                           // Print sleep time and API call
-                          sprintf(modulename, "Video Mix:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "Video Mix:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                       case kTraceFile:
-                          sprintf(modulename, "File:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "File:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                       case kTraceAudioProcessing:
-                          sprintf(modulename, "Audio Proc:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "Audio Proc:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                       case kTraceAudioDevice:
-                          sprintf(modulename, "Audio Device:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "Audio Device:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                       case kTraceVideoRenderer:
-                          sprintf(modulename, "Video Renderer:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "Video Renderer:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                       case kTraceVideoCapture:
-                          sprintf(modulename, "Video Capt:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "Video Capt:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                       case kTraceVideoPreocessing:
-                          sprintf(modulename, "Video Proc:%5ld %5ld;", idEngine,
+                          snprintf(modulename, modulenamesize-1, "Video Proc:%5ld %5ld;", idEngine,
                                   idChannel);
                           break;
                   }
@@ -728,55 +730,55 @@ void TraceImpl::AddImpl(const TraceLevel level, const TraceModule module,
                   switch (module)
                   {
                       case kTraceVoice:
-                          sprintf (modulename, "Voice:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "Voice:%11ld;", idl);
                           break;
                       case kTraceVideo:
-                          sprintf (modulename, "Video:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "Video:%11ld;", idl);
                           break;
                       case kTraceUtility:
-                          sprintf (modulename, "Utility:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "Utility:%11ld;", idl);
                           break;
                       case kTraceRtpRtcp:
-                          sprintf (modulename, "Rtp/Rtcp:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "Rtp/Rtcp:%11ld;", idl);
                           break;
                       case kTraceTransport:
-                          sprintf (modulename, "Transport:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "Transport:%11ld;", idl);
                           break;
                       case kTraceAudioCoding:
-                          sprintf (modulename, "Audio Coding:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "Audio Coding:%11ld;", idl);
                           break;
                       case kTraceSrtp:
-                          sprintf (modulename, "Srtp:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "Srtp:%11ld;", idl);
                           break;
                       case kTraceAudioMixerServer:
-                          sprintf (modulename, "Audio Mix/s:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "Audio Mix/s:%11ld;", idl);
                           break;
                       case kTraceAudioMixerClient:
-                          sprintf (modulename, "Audio Mix/c:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "Audio Mix/c:%11ld;", idl);
                           break;
                       case kTraceVideoCoding:
-                          sprintf (modulename, "Video Coding:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "Video Coding:%11ld;", idl);
                           break;
                       case kTraceVideoMixer:
-                          sprintf (modulename, "Video Mix:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "Video Mix:%11ld;", idl);
                           break;
                       case kTraceFile:
-                          sprintf (modulename, "File:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "File:%11ld;", idl);
                           break;
                       case kTraceAudioProcessing:
-                          sprintf (modulename, "Audio Proc:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "Audio Proc:%11ld;", idl);
                           break;
                       case kTraceAudioDevice:
-                          sprintf (modulename, "Audio Device:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "Audio Device:%11ld;", idl);
                           break;
                       case kTraceVideoRenderer:
-                          sprintf (modulename, "Video Render:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "Video Render:%11ld;", idl);
                           break;
                       case kTraceVideoCapture:
-                          sprintf (modulename, "Video Captur:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "Video Captur:%11ld;", idl);
                           break;
                       case kTraceVideoPreocessing:
-                          sprintf (modulename, "Video Proc:%11ld;", idl);
+                          snprintf (modulename, modulenamesize-1, "Video Proc:%11ld;", idl);
                           break;
                   }
               }
