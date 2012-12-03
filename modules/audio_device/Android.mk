@@ -22,15 +22,13 @@ LOCAL_SRC_FILES := \
     audio_device_generic.cc \
     audio_device_utility.cc \
     audio_device_impl.cc \
-    android/audio_device_opensles_android.cc \
+    android/audio_device_jni_android.cc \
     android/audio_device_utility_android.cc
-    # dummy/audio_device_utility_dummy.cc \
-    # dummy/audio_device_dummy.cc
 
 # Flags passed to both C and C++ files.
 LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS) \
-   '-DWEBRTC_ANDROID_OPENSLES'
+   -DWEBRTC_ANDROID
 
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH) \
@@ -42,8 +40,7 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../.. \
     $(LOCAL_PATH)/../../common_audio/resampler/include \
     $(LOCAL_PATH)/../../common_audio/signal_processing/include \
-    $(LOCAL_PATH)/../../system_wrappers/interface \
-    system/media/wilhelm/include
+    $(LOCAL_PATH)/../../system_wrappers/interface
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

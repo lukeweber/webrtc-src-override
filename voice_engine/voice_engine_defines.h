@@ -138,7 +138,7 @@ enum { kVoiceEngineMaxRtpExtensionId = 14 };
     // AudioProcessing AGC on
 #define WEBRTC_VOICE_ENGINE_EC_DEFAULT_STATE  WEBRTC_AUDIO_PROCESSING_OFF
     // AudioProcessing EC off
-#define WEBRTC_VOICE_ENGINE_VAD_DEFAULT_STATE WEBRTC_AUDIO_PROCESSING_OFF
+#define WEBRTC_VOICE_ENGINE_VAD_DEFAULT_STATE true
     // AudioProcessing off
 #define WEBRTC_VOICE_ENGINE_RX_AGC_DEFAULT_STATE WEBRTC_AUDIO_PROCESSING_OFF
     // AudioProcessing RX AGC off
@@ -371,6 +371,7 @@ namespace
 // ----------------------------------------------------------------------------
 //  Enumerators
 // ----------------------------------------------------------------------------
+
 
 namespace webrtc
 {
