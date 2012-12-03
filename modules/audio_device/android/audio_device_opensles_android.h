@@ -31,13 +31,6 @@ const WebRtc_UWord32 N_MAX_INTERFACES = 3;
 const WebRtc_UWord32 N_MAX_OUTPUT_DEVICES = 6;
 const WebRtc_UWord32 N_MAX_INPUT_DEVICES = 3;
 
-const WebRtc_UWord32 N_REC_SAMPLES_PER_SEC = 16000;//44000;  // Default fs
-const WebRtc_UWord32 N_PLAY_SAMPLES_PER_SEC = 16000;//44000; // Default fs
-
-const WebRtc_UWord32 N_REC_CHANNELS = 1; // default is mono recording
-const WebRtc_UWord32 N_PLAY_CHANNELS = 1; // default is mono playout
-
-const WebRtc_UWord32 REC_BUF_SIZE_IN_SAMPLES = 480; // Handle max 10 ms @ 48 kHz
 const WebRtc_UWord32 PLAY_BUF_SIZE_IN_SAMPLES = 480;
 
 // Number of the buffers in playout queue

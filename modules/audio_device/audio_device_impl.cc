@@ -22,14 +22,11 @@
  #if defined(WEBRTC_WINDOWS_CORE_AUDIO_BUILD)
     #include "audio_device_core_win.h"
  #endif
-#elif defined(WEBRTC_ANDROID_OPENSLES)
-    #include <stdlib.h>
-    #include "audio_device_utility_android.h"
-    #include "audio_device_opensles_android.h"
 #elif defined(WEBRTC_ANDROID)
     #include <stdlib.h>
     #include "audio_device_utility_android.h"
     #include "audio_device_jni_android.h"
+    #include "audio_device_opensles_android.h"
 #elif defined(WEBRTC_LINUX)
     #include "audio_device_utility_linux.h"
  #if defined(LINUX_ALSA)
