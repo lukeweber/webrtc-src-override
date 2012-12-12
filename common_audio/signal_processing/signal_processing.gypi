@@ -63,7 +63,7 @@
         'vector_scaling_operations.c',
       ],
       'conditions': [
-        ['target_arch=="arm"', {
+        ['target_arch=="arm" and OS!="ios"', {
           'sources': [
             'complex_bit_reverse_arm.s',
             'spl_sqrt_floor_arm.s',

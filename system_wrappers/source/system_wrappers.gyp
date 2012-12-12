@@ -15,7 +15,7 @@
       'include_dirs': [
         'spreadsortlib',
         '../interface',
-        '<(DEPTH)/voice-client-core/jni',
+        '<(DEPTH)/',
       ],
       'direct_dependent_settings': {
         'include_dirs': [
@@ -107,7 +107,7 @@
         'trace_posix.h',
         'trace_win.cc',
         'trace_win.h',
-        '<(DEPTH)/voice-client-core/jni/tuenti/threadpriorityhandler.cc',
+        '<(DEPTH)/client/threadpriorityhandler.cc',
       ],
       'conditions': [
         ['enable_data_logging==1', {

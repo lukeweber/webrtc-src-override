@@ -40,7 +40,7 @@ LOCAL_SRC_FILES := \
     sleep.cc \
     thread_posix.cc \
     rw_lock_posix.cc \
-    ../../../../voice-client-core/jni/tuenti/threadpriorityhandler.cc
+    ../../../../client/threadpriorityhandler.cc
 
 ifeq ($(ENABLE_WEBRTC_TRACE), 1)
 	LOCAL_SRC_FILES += \
@@ -57,6 +57,7 @@ LOCAL_CFLAGS := \
 LOCAL_C_INCLUDES := \
     $(MY_ROOT_PATH) \
     $(LOCAL_PATH)/../.. \
+    $(LOCAL_PATH)/../../../../ \
     $(LOCAL_PATH)/../../../../app/jni \
     $(LOCAL_PATH)/../interface \
     $(LOCAL_PATH)/spreadsortlib

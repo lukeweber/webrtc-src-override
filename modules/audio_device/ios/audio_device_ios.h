@@ -19,16 +19,14 @@
 namespace webrtc {
 class ThreadWrapper;
 
-const WebRtc_UWord32 N_REC_SAMPLES_PER_SEC = 44000;
-const WebRtc_UWord32 N_PLAY_SAMPLES_PER_SEC = 44000;
+const WebRtc_UWord32 N_REC_SAMPLES_PER_SEC_IPHONE = 44000;
+const WebRtc_UWord32 N_PLAY_SAMPLES_PER_SEC_IPHONE = 44000;
 
-const WebRtc_UWord32 N_REC_CHANNELS = 1;  // default is mono recording
-const WebRtc_UWord32 N_PLAY_CHANNELS = 1;  // default is mono playout
 const WebRtc_UWord32 N_DEVICE_CHANNELS = 8;
 
-const WebRtc_UWord32 ENGINE_REC_BUF_SIZE_IN_SAMPLES = (N_REC_SAMPLES_PER_SEC
+const WebRtc_UWord32 ENGINE_REC_BUF_SIZE_IN_SAMPLES = (N_REC_SAMPLES_PER_SEC_IPHONE
     / 100);
-const WebRtc_UWord32 ENGINE_PLAY_BUF_SIZE_IN_SAMPLES = (N_PLAY_SAMPLES_PER_SEC
+const WebRtc_UWord32 ENGINE_PLAY_BUF_SIZE_IN_SAMPLES = (N_PLAY_SAMPLES_PER_SEC_IPHONE
     / 100);
 
 // Number of 10 ms recording blocks in recording buffer

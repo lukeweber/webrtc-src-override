@@ -67,7 +67,7 @@
 #include "system_wrappers/interface/event_wrapper.h"
 #include "system_wrappers/interface/trace.h"
 
-#include "tuenti/threadpriorityhandler.h"
+#include "client/threadpriorityhandler.h"
 
 namespace webrtc {
 
