@@ -10,12 +10,6 @@
 
 #include "after_streaming_fixture.h"
 
-#ifdef WEBRTC_LINUX
-#define DISABLED_ON_LINUX(test) DISABLED_##test
-#else
-#define DISABLED_ON_LINUX(test) test
-#endif
-
 class VolumeTest : public AfterStreamingFixture {
 };
 
@@ -194,7 +188,7 @@ TEST_F(VolumeTest, DISABLED_ON_LINUX(ManualSystemInputMutingMutesMicrophone)) {
   Sleep(2000);
 }
 
-TEST_F(VolumeTest, SystemOutputMutingIsNotEnabledByDefault) {
+TEST_F(VolumeTest, DISABLED_ON_LINUX(SystemOutputMutingIsNotEnabledByDefault)) {
   bool is_muted = true;
   EXPECT_EQ(0, voe_volume_control_->GetSystemOutputMute(is_muted));
   EXPECT_FALSE(is_muted);

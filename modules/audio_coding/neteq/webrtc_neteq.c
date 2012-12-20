@@ -648,7 +648,8 @@ int WebRtcNetEQ_CodecDbAdd(void *inst, WebRtcNetEQ_CodecDef *codecInst)
         codecInst->payloadType, codecInst->funcDecode, codecInst->funcDecodeRCU,
         codecInst->funcDecodePLC, codecInst->funcDecodeInit, codecInst->funcAddLatePkt,
         codecInst->funcGetMDinfo, codecInst->funcGetPitch, codecInst->funcUpdBWEst,
-        codecInst->funcGetErrorCode, codecInst->codec_state, codecInst->codec_fs);
+        codecInst->funcDurationEst, codecInst->funcGetErrorCode,
+        codecInst->codec_state, codecInst->codec_fs);
     if (ok != 0)
     {
         NetEqMainInst->ErrorCode = -ok;
@@ -1170,6 +1171,8 @@ int WebRtcNetEQ_GetNetworkStatistics(void *inst, WebRtcNetEQ_NetworkStatistics *
     /* Instance sanity */
     if (NetEqMainInst == NULL) return (-1);
 
+    stats->addedSamples = NetEqMainInst->DSPinst.statInst.addedSamples;
+
     /*******************/
     /* Get buffer size */
     /*******************/
@@ -1179,7 +1182,8 @@ int WebRtcNetEQ_GetNetworkStatistics(void *inst, WebRtcNetEQ_NetworkStatistics *
         WebRtc_Word32 temp32;
         /* Query packet buffer for number of samples. */
         temp32 = WebRtcNetEQ_PacketBufferGetSize(
-            &NetEqMainInst->MCUinst.PacketBuffer_inst);
+            &NetEqMainInst->MCUinst.PacketBuffer_inst,
+            &NetEqMainInst->MCUinst.codec_DB_inst);
 
         /* Divide by sample rate.
          * Calculate temp32 * 1000 / fs to get result in ms. */

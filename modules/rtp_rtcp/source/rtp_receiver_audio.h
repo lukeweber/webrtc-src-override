@@ -13,28 +13,24 @@
 
 #include <set>
 
+#include "rtp_receiver.h"
+#include "rtp_receiver_strategy.h"
 #include "rtp_rtcp_defines.h"
 #include "rtp_utility.h"
-
+#include "scoped_ptr.h"
 #include "typedefs.h"
 
 namespace webrtc {
 class CriticalSectionWrapper;
+class RTPReceiver;
 
-class RTPReceiverAudio
+// Handles audio RTP packets. This class is thread-safe.
+class RTPReceiverAudio : public RTPReceiverStrategy
 {
 public:
-    RTPReceiverAudio(const WebRtc_Word32 id);
-    virtual ~RTPReceiverAudio();
-
-    WebRtc_Word32 RegisterIncomingAudioCallback(RtpAudioFeedback* incomingMessagesCallback);
-
-    ModuleRTPUtility::Payload* RegisterReceiveAudioPayload(
-        const char payloadName[RTP_PAYLOAD_NAME_SIZE],
-        const WebRtc_Word8 payloadType,
-        const WebRtc_UWord32 frequency,
-        const WebRtc_UWord8 channels,
-        const WebRtc_UWord32 rate);
+    RTPReceiverAudio(const WebRtc_Word32 id,
+                     RTPReceiver* parent,
+                     RtpAudioFeedback* incomingMessagesCallback);
 
     WebRtc_UWord32 AudioFrequency() const;
 
@@ -52,25 +48,84 @@ public:
     // Is TelephoneEvent configured with payload type payloadType
     bool TelephoneEventPayloadType(const WebRtc_Word8 payloadType) const;
 
-    // Is CNG configured with payload type payloadType
-    bool CNGPayloadType(const WebRtc_Word8 payloadType, WebRtc_UWord32& frequency);
+    // Returns true if CNG is configured with payload type payloadType. If so,
+    // the frequency and cngPayloadTypeHasChanged are filled in.
+    bool CNGPayloadType(const WebRtc_Word8 payloadType,
+                        WebRtc_UWord32* frequency,
+                        bool* cngPayloadTypeHasChanged);
 
-    WebRtc_Word32 ParseAudioCodecSpecific(WebRtcRTPHeader* rtpHeader,
-                                        const WebRtc_UWord8* payloadData,
-                                        const WebRtc_UWord16 payloadLength,
-                                        const ModuleRTPUtility::AudioPayload& audioSpecific,
-                                        const bool isRED);
+    WebRtc_Word32 ParseRtpPacket(
+        WebRtcRTPHeader* rtpHeader,
+        const ModuleRTPUtility::PayloadUnion& specificPayload,
+        const bool isRed,
+        const WebRtc_UWord8* packet,
+        const WebRtc_UWord16 packetLength,
+        const WebRtc_Word64 timestampMs);
 
-    virtual WebRtc_Word32 ResetStatistics() = 0;
+    WebRtc_Word32 GetFrequencyHz() const;
 
-protected:
-    virtual WebRtc_Word32 CallbackOfReceivedPayloadData(const WebRtc_UWord8* payloadData,
-                                                      const WebRtc_UWord16 payloadSize,
-                                                      const WebRtcRTPHeader* rtpHeader) = 0;
+    RTPAliveType ProcessDeadOrAlive(WebRtc_UWord16 lastPayloadLength) const;
+
+    bool PayloadIsCompatible(
+        const ModuleRTPUtility::Payload& payload,
+        const WebRtc_UWord32 frequency,
+        const WebRtc_UWord8 channels,
+        const WebRtc_UWord32 rate) const;
+
+    void UpdatePayloadRate(
+        ModuleRTPUtility::Payload* payload,
+        const WebRtc_UWord32 rate) const;
+
+    ModuleRTPUtility::Payload* CreatePayloadType(
+          const char payloadName[RTP_PAYLOAD_NAME_SIZE],
+          const WebRtc_Word8 payloadType,
+          const WebRtc_UWord32 frequency,
+          const WebRtc_UWord8 channels,
+          const WebRtc_UWord32 rate);
+
+    WebRtc_Word32 InvokeOnInitializeDecoder(
+          RtpFeedback* callback,
+          const WebRtc_Word32 id,
+          const WebRtc_Word8 payloadType,
+          const char payloadName[RTP_PAYLOAD_NAME_SIZE],
+          const ModuleRTPUtility::PayloadUnion& specificPayload) const;
+
+    // We do not allow codecs to have multiple payload types for audio, so we
+    // need to override the default behavior (which is to do nothing).
+    void PossiblyRemoveExistingPayloadType(
+        ModuleRTPUtility::PayloadTypeMap* payloadTypeMap,
+        const char payloadName[RTP_PAYLOAD_NAME_SIZE],
+        const size_t payloadNameLength,
+        const WebRtc_UWord32 frequency,
+        const WebRtc_UWord8 channels,
+        const WebRtc_UWord32 rate) const;
+
+    // We need to look out for special payload types here and sometimes reset
+    // statistics. In addition we sometimes need to tweak the frequency.
+    void CheckPayloadChanged(
+        const WebRtc_Word8 payloadType,
+        ModuleRTPUtility::PayloadUnion* specificPayload,
+        bool* shouldResetStatistics,
+        bool* shouldDiscardChanges);
 private:
-    WebRtc_Word32             _id;
+    void SendTelephoneEvents(
+        WebRtc_UWord8 numberOfNewEvents,
+        WebRtc_UWord8 newEvents[MAX_NUMBER_OF_PARALLEL_TELEPHONE_EVENTS],
+        WebRtc_UWord8 numberOfRemovedEvents,
+        WebRtc_UWord8 removedEvents[MAX_NUMBER_OF_PARALLEL_TELEPHONE_EVENTS]);
 
-    WebRtc_UWord32            _lastReceivedFrequency;
+    WebRtc_Word32 ParseAudioCodecSpecific(
+        WebRtcRTPHeader* rtpHeader,
+        const WebRtc_UWord8* payloadData,
+        const WebRtc_UWord16 payloadLength,
+        const ModuleRTPUtility::AudioPayload& audioSpecific,
+        const bool isRED);
+
+    WebRtc_Word32                      _id;
+    RTPReceiver*                       _parent;
+    scoped_ptr<CriticalSectionWrapper> _criticalSectionRtpReceiverAudio;
+
+    WebRtc_UWord32                     _lastReceivedFrequency;
 
     bool                    _telephoneEvent;
     bool                    _telephoneEventForwardToDecoder;
@@ -82,14 +137,13 @@ private:
     WebRtc_Word8              _cngWBPayloadType;
     WebRtc_Word8              _cngSWBPayloadType;
     WebRtc_Word8              _cngFBPayloadType;
-    WebRtc_Word8                _cngPayloadType;
+    WebRtc_Word8              _cngPayloadType;
 
     // G722 is special since it use the wrong number of RTP samples in timestamp VS. number of samples in the frame
     WebRtc_Word8              _G722PayloadType;
-    bool                    _lastReceivedG722;
+    bool                      _lastReceivedG722;
 
-    CriticalSectionWrapper* _criticalSectionFeedback;
-    RtpAudioFeedback*   _cbAudioFeedback;
+    RtpAudioFeedback*         _cbAudioFeedback;
 };
 } // namespace webrtc
 #endif // WEBRTC_MODULES_RTP_RTCP_SOURCE_RTP_RECEIVER_AUDIO_H_

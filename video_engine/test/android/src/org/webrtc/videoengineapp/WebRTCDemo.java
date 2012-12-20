@@ -28,6 +28,7 @@ import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 import android.util.Log;
@@ -94,7 +95,15 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
     private static final int SEND_CODEC_FRAMERATE = 15;
     private static final int INIT_BITRATE = 500;
     private static final String LOOPBACK_IP = "127.0.0.1";
-    private static final String RINGTONE_URL = "content://settings/system/ringtone";
+    // Zero means don't automatically start/stop calls.
+    private static final long AUTO_CALL_RESTART_DELAY_MS = 0;
+
+    private Handler handler = new Handler();
+    private Runnable startOrStopCallback = new Runnable() {
+            public void run() {
+                startOrStop();
+            }
+        };
 
     private int volumeLevel = 204;
 
@@ -123,9 +132,12 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
     private boolean loopbackMode = true;
     private CheckBox cbStats;
     private boolean isStatsOn = true;
-    private CheckBox cbCPULoad;
-    private boolean isCPULoadOn = true;
-    private boolean useOpenGLRender = true;
+    public enum RenderType {
+        OPENGL,
+        SURFACE,
+        MEDIACODEC
+    }
+    RenderType renderType = RenderType.OPENGL;
 
     // Video settings
     private Spinner spCodecType;
@@ -165,6 +177,7 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
     private int packetLoss;
     private int frameRateO;
     private int bitRateO;
+    private int numCalls = 0;
 
     // Variable for storing variables
     private String webrtcName = "/webrtc";
@@ -178,9 +191,6 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
     private String[] mVideoCodecsSizeStrings = { "176x144", "320x240",
                                                  "352x288", "640x480" };
     private String[] mVoiceCodecsStrings = null;
-
-    private Thread mBackgroundLoad = null;
-    private boolean mIsBackgroudLoadRunning = false;
 
     private OrientationEventListener orientationListener;
     int currentOrientation = OrientationEventListener.ORIENTATION_UNKNOWN;
@@ -311,15 +321,18 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
         }
 
         startMain();
-        return;
+
+        if (AUTO_CALL_RESTART_DELAY_MS > 0)
+            startOrStop();
     }
 
     // Called before the activity is destroyed.
     @Override
     public void onDestroy() {
         Log.d(TAG, "onDestroy");
-        super.onDestroy();
+        handler.removeCallbacks(startOrStopCallback);
         unregisterReceiver(receiver);
+        super.onDestroy();
     }
 
     private class StatsView extends View{
@@ -330,16 +343,18 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
         @Override protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
 
-            Paint mLoadPaint = new Paint();
-            mLoadPaint.setAntiAlias(true);
-            mLoadPaint.setTextSize(16);
-            mLoadPaint.setARGB(255, 255, 255, 255);
+            Paint loadPaint = new Paint();
+            loadPaint.setAntiAlias(true);
+            loadPaint.setTextSize(16);
+            loadPaint.setARGB(255, 255, 255, 255);
 
-            String mLoadText;
-            mLoadText = "> " + frameRateI + " fps/" + bitRateI + "k bps/ " + packetLoss;
-            canvas.drawText(mLoadText, 4, 172, mLoadPaint);
-            mLoadText = "< " + frameRateO + " fps/ " + bitRateO + "k bps";
-            canvas.drawText(mLoadText, 4, 192, mLoadPaint);
+            canvas.drawText("#calls " + numCalls, 4, 152, loadPaint);
+
+            String loadText;
+            loadText = "> " + frameRateI + " fps/" + bitRateI + "k bps/ " + packetLoss;
+            canvas.drawText(loadText, 4, 172, loadPaint);
+            loadText = "< " + frameRateO + " fps/ " + bitRateO + "k bps";
+            canvas.drawText(loadText, 4, 192, loadPaint);
 
             updateDisplay();
         }
@@ -391,8 +406,6 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
         Log.d(TAG, "stopAll");
 
         if (vieAndroidAPI != null) {
-
-            stopCPULoad();
 
             if (voERunning) {
                 voERunning = false;
@@ -487,7 +500,7 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
         spCodecSize.setAdapter(new SpinnerAdapter(this,
                         R.layout.row,
                         mVideoCodecsSizeStrings));
-        spCodecSize.setSelection(0);
+        spCodecSize.setSelection(mVideoCodecsSizeStrings.length - 1);
 
         // Voice codec
         mVoiceCodecsStrings = vieAndroidAPI.VoE_GetCodecs();
@@ -507,10 +520,12 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
 
         RadioGroup radioGroup = (RadioGroup) findViewById(R.id.radio_group1);
         radioGroup.clearCheck();
-        if (useOpenGLRender == true) {
+        if (renderType == RenderType.OPENGL) {
             radioGroup.check(R.id.radio_opengl);
-        } else {
+        } else if (renderType == RenderType.SURFACE) {
             radioGroup.check(R.id.radio_surface);
+        } else if (renderType == RenderType.MEDIACODEC) {
+            radioGroup.check(R.id.radio_mediacodec);
         }
 
         etRemoteIp = (EditText) findViewById(R.id.etRemoteIp);
@@ -521,9 +536,6 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
 
         cbStats = (CheckBox) findViewById(R.id.cbStats);
         cbStats.setChecked(isStatsOn);
-
-        cbCPULoad = (CheckBox) findViewById(R.id.cbCPULoad);
-        cbCPULoad.setChecked(isCPULoadOn);
 
         cbVoice = (CheckBox) findViewById(R.id.cbVoice);
         cbVoice.setChecked(enableVoice);
@@ -569,7 +581,6 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
         etRemoteIp.setOnClickListener(this);
         cbLoopback.setOnClickListener(this);
         cbStats.setOnClickListener(this);
-        cbCPULoad.setOnClickListener(this);
         cbEnableNack.setOnClickListener(this);
         cbEnableSpeaker.setOnClickListener(this);
         cbEnableAECM.setOnClickListener(this);
@@ -595,22 +606,8 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
         return etRemoteIp.getText().toString();
     }
 
-    private void startPlayingRingtone() {
-        MediaPlayer mMediaPlayer = new MediaPlayer();
-        try {
-            mMediaPlayer.setDataSource(this, Uri.parse(RINGTONE_URL));
-            mMediaPlayer.prepare();
-            mMediaPlayer.seekTo(0);
-            mMediaPlayer.start();
-        } catch (IOException e) {
-            Log.v(TAG, "MediaPlayer Failed: " + e);
-        }
-    }
-
     private void startCall() {
         int ret = 0;
-
-        startPlayingRingtone();
 
         if (enableVoice) {
             startVoiceEngine();
@@ -630,13 +627,25 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
                                                    getRemoteIPString());
 
             if (enableVideoReceive) {
-                if (useOpenGLRender) {
+                if (renderType == RenderType.OPENGL) {
                     Log.v(TAG, "Create OpenGL Render");
                     remoteSurfaceView = ViERenderer.CreateRenderer(this, true);
-                    ret = vieAndroidAPI.AddRemoteRenderer(channel, remoteSurfaceView);
-                } else {
+                } else if (renderType == RenderType.SURFACE) {
                     Log.v(TAG, "Create SurfaceView Render");
                     remoteSurfaceView = ViERenderer.CreateRenderer(this, false);
+                } else if (renderType == RenderType.MEDIACODEC) {
+                    Log.v(TAG, "Create MediaCodec Decoder/Renderer");
+                    remoteSurfaceView = new SurfaceView(this);
+                }
+
+                if (mLlRemoteSurface != null) {
+                    mLlRemoteSurface.addView(remoteSurfaceView);
+                }
+
+                if (renderType == RenderType.MEDIACODEC) {
+                    ret = vieAndroidAPI.SetExternalMediaCodecDecoderRenderer(
+                            channel, remoteSurfaceView);
+                } else {
                     ret = vieAndroidAPI.AddRemoteRenderer(channel, remoteSurfaceView);
                 }
 
@@ -679,24 +688,11 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
                 }
             }
 
-            if (enableVideoReceive) {
-                if (mLlRemoteSurface != null) {
-                    mLlRemoteSurface.addView(remoteSurfaceView);
-                }
-            }
-
             isStatsOn = cbStats.isChecked();
             if (isStatsOn) {
                 addStatusView();
             } else {
                 removeStatusView();
-            }
-
-            isCPULoadOn = cbCPULoad.isChecked();
-            if (isCPULoadOn) {
-                startCPULoad();
-            } else {
-                stopCPULoad();
             }
 
             viERunning = true;
@@ -813,6 +809,24 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
         }
     }
 
+    private void startOrStop() {
+        readSettings();
+        if (viERunning || voERunning) {
+            stopAll();
+            startMain();
+            wakeLock.release(); // release the wake lock
+            btStartStopCall.setText(R.string.startCall);
+        } else if (enableVoice || enableVideo){
+            ++numCalls;
+            startCall();
+            wakeLock.acquire(); // screen stay on during the call
+            btStartStopCall.setText(R.string.stopCall);
+        }
+        if (AUTO_CALL_RESTART_DELAY_MS > 0) {
+            handler.postDelayed(startOrStopCallback, AUTO_CALL_RESTART_DELAY_MS);
+        }
+    }
+
     public void onClick(View arg0) {
         switch (arg0.getId()) {
             case R.id.btSwitchCamera:
@@ -836,17 +850,8 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
                 }
                 break;
             case R.id.btStartStopCall:
-                readSettings();
-                if (viERunning || voERunning) {
-                    stopAll();
-                    wakeLock.release(); // release the wake lock
-                    btStartStopCall.setText(R.string.startCall);
-                } else if (enableVoice || enableVideo){
-                    startCall();
-                    wakeLock.acquire(); // screen stay on during the call
-                    btStartStopCall.setText(R.string.stopCall);
-                }
-                break;
+              startOrStop();
+              break;
             case R.id.btExit:
                 stopAll();
                 finish();
@@ -872,19 +877,14 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
                     removeStatusView();
                 }
                 break;
-            case R.id.cbCPULoad:
-                isCPULoadOn = cbCPULoad.isChecked();
-                if (isCPULoadOn) {
-                    startCPULoad();
-                } else {
-                    stopCPULoad();
-                }
-                break;
             case R.id.radio_surface:
-                useOpenGLRender = false;
+                renderType = RenderType.SURFACE;
                 break;
             case R.id.radio_opengl:
-                useOpenGLRender = true;
+                renderType = RenderType.OPENGL;
+                break;
+            case R.id.radio_mediacodec:
+                renderType = RenderType.MEDIACODEC;
                 break;
             case R.id.cbNack:
                 enableNack  = cbEnableNack.isChecked();
@@ -1050,38 +1050,4 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
         statsView = null;
     }
 
-    private void startCPULoad() {
-        if (null == mBackgroundLoad) {
-            mBackgroundLoad = new Thread(new Runnable() {
-                    public void run() {
-                        Log.v(TAG, "Background load started");
-                        mIsBackgroudLoadRunning = true;
-                        try {
-                            while (mIsBackgroudLoadRunning) {
-                                // This while loop simulates cpu load.
-                                // Log.v(TAG, "Runnable!!!");
-                            }
-                        } catch (Throwable t) {
-                            Log.v(TAG, "startCPULoad failed");
-                        }
-                    }
-                });
-            mBackgroundLoad.start();
-        } else {
-            if (mBackgroundLoad.getState() == Thread.State.TERMINATED) {
-                mBackgroundLoad.start();
-            }
-        }
-    }
-
-    private void stopCPULoad() {
-        if (null != mBackgroundLoad) {
-            mIsBackgroudLoadRunning = false;
-            try {
-                mBackgroundLoad.join();
-            } catch (Throwable t) {
-                Log.v(TAG, "stopCPULoad failed");
-            }
-        }
-    }
 }

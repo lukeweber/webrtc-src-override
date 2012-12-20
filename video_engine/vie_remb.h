@@ -8,19 +8,12 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-// 1. Register a RtpRtcp module to include in the REMB packet.
-// 2. When UpdateBitrateEstimate is called for the first time for a SSRC, add it
-//    to the map.
-// 3. Send a new REMB every kRembSendIntervallMs or if a lower bitrate estimate
-//    for a specified SSRC.
-
-
 #ifndef WEBRTC_VIDEO_ENGINE_VIE_REMB_H_
 #define WEBRTC_VIDEO_ENGINE_VIE_REMB_H_
 
 #include <list>
-#include <map>
 #include <utility>
+#include <vector>
 
 #include "modules/interface/module.h"
 #include "modules/remote_bitrate_estimator/include/remote_bitrate_estimator.h"
@@ -58,7 +51,8 @@ class VieRemb : public RemoteBitrateObserver, public Module {
   // estimate has decreased or if no RTCP REMB packet has been sent for
   // a certain time interval.
   // Implements RtpReceiveBitrateUpdate.
-  virtual void OnReceiveBitrateChanged(unsigned int bitrate);
+  virtual void OnReceiveBitrateChanged(std::vector<unsigned int>* ssrcs,
+                                       unsigned int bitrate);
 
   // Implements Module.
   virtual WebRtc_Word32 ChangeUniqueId(const WebRtc_Word32 id);
@@ -83,6 +77,7 @@ class VieRemb : public RemoteBitrateObserver, public Module {
 
   // The last bitrate update.
   unsigned int bitrate_;
+  std::vector<unsigned int> ssrcs_;
   int64_t bitrate_update_time_ms_;
 };
 

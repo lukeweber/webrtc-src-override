@@ -20,6 +20,7 @@
 #include "video_engine/test/libvietest/include/vie_to_file_renderer.h"
 
 class FrameDropDetector;
+struct NetworkParameters;
 class TbInterfaces;
 
 // Initializes the Video engine and its components, runs video playback using
@@ -33,9 +34,10 @@ void TestFullStack(const TbInterfaces& interfaces,
                    int width,
                    int height,
                    int bit_rate_kbps,
-                   int packet_loss_percent,
-                   int network_delay_ms,
-                   FrameDropDetector* frame_drop_detector);
+                   const NetworkParameters& network,
+                   FrameDropDetector* frame_drop_detector,
+                   ViEToFileRenderer* remote_file_renderer,
+                   ViEToFileRenderer* local_file_renderer);
 
 // A frame in a video file. The four different points in the stack when
 // register the frame state are (in time order): created, transmitted, decoded,
@@ -146,7 +148,8 @@ class FrameDropDetector {
         timestamp_diff_(0) {}
 
   // Reports a frame has reached a state in the frame life cycle.
-  void ReportFrameState(State state, unsigned int timestamp);
+  void ReportFrameState(State state, unsigned int timestamp,
+                        int64_t report_time_us);
 
   // Uses all the gathered timestamp information to calculate which frames have
   // been dropped during the test and where they were dropped. Not until
@@ -165,9 +168,11 @@ class FrameDropDetector {
   const std::vector<Frame*>& GetAllFrames();
 
   // Prints a detailed report about all the different frame states and which
-  // ones are detected as dropped, using ViETest::Log.
+  // ones are detected as dropped, using ViETest::Log. Also prints
+  // perf-formatted output and adds |test_label| as a modifier to the perf
+  // output.
   // CalculateResults() must be called before calling this method.
-  void PrintReport();
+  void PrintReport(const std::string& test_label);
 
   // Prints all the timestamp maps. Mainly used for debugging purposes to find
   // missing timestamps.

@@ -40,6 +40,7 @@ LOCAL_CFLAGS := \
 #   -DWEBRTC_NS_FLOAT'
 
 LOCAL_C_INCLUDES := \
+    $(MY_THIRD_PARTY_PATH) \
     $(LOCAL_PATH)/include \
     $(LOCAL_PATH)/aec/include \
     $(LOCAL_PATH)/aecm/include \
@@ -50,7 +51,8 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../../common_audio/signal_processing/include \
     $(LOCAL_PATH)/../../common_audio/vad/include \
     $(LOCAL_PATH)/../../system_wrappers/interface \
-    external/protobuf/src
+    external/protobuf/src \
+    external/webrtc
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

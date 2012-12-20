@@ -8,17 +8,20 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "trace.h"
 #include "rtp_receiver.h"
 
-#include "rtp_rtcp_defines.h"
-#include "rtp_rtcp_impl.h"
-#include "critical_section_wrapper.h"
-
 #include <cassert>
-#include <string.h> //memcpy
 #include <math.h>   // floor
 #include <stdlib.h> // abs
+#include <string.h> //memcpy
+
+#include "critical_section_wrapper.h"
+#include "rtp_receiver_audio.h"
+#include "rtp_receiver_strategy.h"
+#include "rtp_receiver_video.h"
+#include "rtp_rtcp_defines.h"
+#include "rtp_rtcp_impl.h"
+#include "trace.h"
 
 namespace webrtc {
 
@@ -32,12 +35,10 @@ using ModuleRTPUtility::VideoPayload;
 RTPReceiver::RTPReceiver(const WebRtc_Word32 id,
                          const bool audio,
                          RtpRtcpClock* clock,
-                         ModuleRtpRtcpImpl* owner) :
-    RTPReceiverAudio(id),
-    RTPReceiverVideo(id, owner),
+                         ModuleRtpRtcpImpl* owner,
+                         RtpAudioFeedback* incomingMessagesCallback) :
     Bitrate(clock),
     _id(id),
-    _audio(audio),
     _rtpRtcp(*owner),
     _criticalSectionCbs(CriticalSectionWrapper::CreateCriticalSection()),
     _cbRtpFeedback(NULL),
@@ -49,8 +50,6 @@ RTPReceiver::RTPReceiver(const WebRtc_Word32 id,
     _lastReceivedPayloadLength(0),
     _lastReceivedPayloadType(-1),
     _lastReceivedMediaPayloadType(-1),
-    _lastReceivedAudioSpecific(),
-    _lastReceivedVideoSpecific(),
 
     _packetTimeOutMS(0),
 
@@ -96,13 +95,21 @@ RTPReceiver::RTPReceiver(const WebRtc_Word32 id,
     _nackMethod(kNackOff),
     _RTX(false),
     _ssrcRTX(0) {
+  // TODO(phoglund): Remove hacks requiring direct access to the audio receiver
+  // and only instantiate one of these directly into the _rtpMediaReceiver
+  // field. Right now an audio receiver carries around a video handler and
+  // vice versa, which doesn't make sense.
+  _rtpReceiverAudio = new RTPReceiverAudio(id, this, incomingMessagesCallback);
+  _rtpReceiverVideo = new RTPReceiverVideo(id, this, owner);
+
+  if (audio) {
+    _rtpMediaReceiver = _rtpReceiverAudio;
+  } else {
+    _rtpMediaReceiver = _rtpReceiverVideo;
+  }
+
   memset(_currentRemoteCSRC, 0, sizeof(_currentRemoteCSRC));
   memset(_currentRemoteEnergy, 0, sizeof(_currentRemoteEnergy));
-  memset(&_lastReceivedAudioSpecific, 0, sizeof(_lastReceivedAudioSpecific));
-
-  _lastReceivedAudioSpecific.channels = 1;
-  _lastReceivedVideoSpecific.maxRate = 0;
-  _lastReceivedVideoSpecific.videoCodecType = kRtpNoVideo;
 
   WEBRTC_TRACE(kTraceMemory, kTraceRtpRtcp, id, "%s created", __FUNCTION__);
 }
@@ -121,19 +128,25 @@ RTPReceiver::~RTPReceiver() {
     delete it->second;
     _payloadTypeMap.erase(it);
   }
+  delete _rtpReceiverVideo;
+  delete _rtpReceiverAudio;
   WEBRTC_TRACE(kTraceMemory, kTraceRtpRtcp, _id, "%s deleted", __FUNCTION__);
 }
 
 RtpVideoCodecTypes
 RTPReceiver::VideoCodecType() const
 {
-    return _lastReceivedVideoSpecific.videoCodecType;
+    ModuleRTPUtility::PayloadUnion mediaSpecific;
+    _rtpMediaReceiver->GetLastMediaSpecificPayload(&mediaSpecific);
+    return mediaSpecific.Video.videoCodecType;
 }
 
 WebRtc_UWord32
 RTPReceiver::MaxConfiguredBitrate() const
 {
-    return _lastReceivedVideoSpecific.maxRate;
+    ModuleRTPUtility::PayloadUnion mediaSpecific;
+    _rtpMediaReceiver->GetLastMediaSpecificPayload(&mediaSpecific);
+    return mediaSpecific.Video.maxRate;
 }
 
 bool
@@ -157,6 +170,11 @@ RTPReceiver::SetPacketTimeout(const WebRtc_UWord32 timeoutMS)
     return 0;
 }
 
+bool RTPReceiver::HaveNotReceivedPackets() const
+{
+    return _lastReceiveTime == 0;
+}
+
 void RTPReceiver::PacketTimeout()
 {
     bool packetTimeOut = false;
@@ -168,7 +186,7 @@ void RTPReceiver::PacketTimeout()
             return;
         }
 
-        if(_lastReceiveTime == 0)
+        if (HaveNotReceivedPackets())
         {
             // not active
             return;
@@ -192,7 +210,7 @@ void RTPReceiver::PacketTimeout()
 }
 
 void
-RTPReceiver::ProcessDeadOrAlive(const bool RTCPalive, const WebRtc_Word64 now)
+RTPReceiver::ProcessDeadOrAlive(const bool rtcpAlive, const WebRtc_Word64 now)
 {
     if(_cbRtpFeedback == NULL)
     {
@@ -208,25 +226,10 @@ RTPReceiver::ProcessDeadOrAlive(const bool RTCPalive, const WebRtc_Word64 now)
 
     } else
     {
-        if(RTCPalive)
+        if(rtcpAlive)
         {
-            if(_audio)
-            {
-                // alive depends on CNG
-                // if last received size < 10 likely CNG
-                if(_lastReceivedPayloadLength < 10) // our CNG is 9 bytes
-                {
-                    // potential CNG
-                    // receiver need to check kRtpNoRtp against NetEq speechType kOutputPLCtoCNG
-                    alive = kRtpNoRtp;
-                } else
-                {
-                    // dead
-                }
-            } else
-            {
-                // dead for video
-            }
+            alive = _rtpMediaReceiver->ProcessDeadOrAlive(
+                _lastReceivedPayloadLength);
         }else
         {
             // no RTP packet for 1 sec and no RTCP
@@ -322,19 +325,9 @@ WebRtc_Word32 RTPReceiver::RegisterReceivePayload(
     // if same ignore sending an error
     if (payloadNameLength == nameLength &&
         StringCompare(payload->name, payloadName, payloadNameLength)) {
-      if (_audio &&
-          payload->audio &&
-          payload->typeSpecific.Audio.frequency == frequency &&
-          payload->typeSpecific.Audio.channels == channels &&
-          (payload->typeSpecific.Audio.rate == rate ||
-              payload->typeSpecific.Audio.rate == 0 || rate == 0)) {
-        payload->typeSpecific.Audio.rate = rate;
-        // Ensure that we update the rate if new or old is zero
-        return 0;
-      }
-      if (!_audio && !payload->audio) {
-        // update maxBitrate for video
-        payload->typeSpecific.Video.maxRate = rate;
+      if (_rtpMediaReceiver->PayloadIsCompatible(*payload, frequency,
+                                                 channels, rate)) {
+        _rtpMediaReceiver->UpdatePayloadRate(payload, rate);
         return 0;
       }
     }
@@ -343,38 +336,11 @@ WebRtc_Word32 RTPReceiver::RegisterReceivePayload(
                  __FUNCTION__, payloadType);
     return -1;
   }
-  if (_audio) {
-    // remove existing item, hence search for the name
-    // only for audio, for video we allow a codecs to use multiple pltypes
-    std::map<WebRtc_Word8, Payload*>::iterator audio_it =
-        _payloadTypeMap.begin();
-    while (audio_it != _payloadTypeMap.end()) {
-      Payload* payload = audio_it->second;
-      size_t nameLength = strlen(payload->name);
 
-      if (payloadNameLength == nameLength &&
-          StringCompare(payload->name, payloadName, payloadNameLength)) {
-        // we found the payload name in the list
-        // if audio check frequency and rate
-        if (payload->audio) {
-          if (payload->typeSpecific.Audio.frequency == frequency &&
-              (payload->typeSpecific.Audio.rate == rate ||
-                  payload->typeSpecific.Audio.rate == 0 || rate == 0) &&
-                  payload->typeSpecific.Audio.channels == channels) {
-            // remove old setting
-            delete payload;
-            _payloadTypeMap.erase(audio_it);
-            break;
-          }
-        } else if(StringCompare(payloadName,"red",3)) {
-          delete payload;
-          _payloadTypeMap.erase(audio_it);
-          break;
-        }
-      }
-      audio_it++;
-    }
-  }
+  _rtpMediaReceiver->PossiblyRemoveExistingPayloadType(
+      &_payloadTypeMap, payloadName, payloadNameLength, frequency, channels,
+      rate);
+
   Payload* payload = NULL;
 
   // save the RED payload type
@@ -386,12 +352,8 @@ WebRtc_Word32 RTPReceiver::RegisterReceivePayload(
     payload->name[RTP_PAYLOAD_NAME_SIZE - 1] = 0;
     strncpy(payload->name, payloadName, RTP_PAYLOAD_NAME_SIZE - 1);
   } else {
-    if (_audio) {
-      payload = RegisterReceiveAudioPayload(payloadName, payloadType,
-                                            frequency, channels, rate);
-    } else {
-      payload = RegisterReceiveVideoPayload(payloadName, payloadType, rate);
-    }
+    payload = _rtpMediaReceiver->CreatePayloadType(
+        payloadName, payloadType, frequency, channels, rate);
   }
   if (payload == NULL) {
     WEBRTC_TRACE(kTraceError, kTraceRtpRtcp, _id,
@@ -502,7 +464,7 @@ WebRtc_Word32 RTPReceiver::ReceivePayload(
     if(payload->audio) {
       *frequency = payload->typeSpecific.Audio.frequency;
     } else {
-      *frequency = 90000;
+      *frequency = kDefaultVideoFrequency;
     }
   }
   if (channels) {
@@ -555,7 +517,7 @@ WebRtc_Word32 RTPReceiver::RemotePayload(
     if (payload->audio) {
       *frequency = payload->typeSpecific.Audio.frequency;
     } else {
-      *frequency = 90000;
+      *frequency = kDefaultVideoFrequency;
     }
   }
   if (channels) {
@@ -711,19 +673,12 @@ WebRtc_Word32 RTPReceiver::IncomingRTPPacket(
   CheckSSRCChanged(rtp_header);
 
   bool is_red = false;
-  VideoPayload video_specific;
-  video_specific.maxRate = 0;
-  video_specific.videoCodecType = kRtpNoVideo;
-
-  AudioPayload audio_specific;
-  audio_specific.channels = 0;
-  audio_specific.frequency = 0;
+  ModuleRTPUtility::PayloadUnion specificPayload;
 
   if (CheckPayloadChanged(rtp_header,
                           first_payload_byte,
                           is_red,
-                          audio_specific,
-                          video_specific) == -1) {
+                          &specificPayload) == -1) {
     if (length - rtp_header->header.headerLength == 0)
     {
       // ok keepalive packet
@@ -739,29 +694,13 @@ WebRtc_Word32 RTPReceiver::IncomingRTPPacket(
   }
   CheckCSRC(rtp_header);
 
-  const WebRtc_UWord8* payload_data =
-      packet + rtp_header->header.headerLength;
-
   WebRtc_UWord16 payload_data_length =
-      static_cast<WebRtc_UWord16>(length - rtp_header->header.headerLength);
+      ModuleRTPUtility::GetPayloadDataLength(rtp_header, packet_length);
 
-  WebRtc_Word32 retVal = 0;
-  if(_audio) {
-    retVal = ParseAudioCodecSpecific(rtp_header,
-                                     payload_data,
-                                     payload_data_length,
-                                     audio_specific,
-                                     is_red);
-  } else {
-    retVal = ParseVideoCodecSpecific(rtp_header,
-                                     payload_data,
-                                     payload_data_length,
-                                     video_specific.videoCodecType,
-                                     is_red,
-                                     packet,
-                                     packet_length,
-                                     _clock.GetTimeInMS());
-  }
+  WebRtc_Word32 retVal = _rtpMediaReceiver->ParseRtpPacket(
+      rtp_header, specificPayload, is_red, packet,
+      packet_length, _clock.GetTimeInMS());
+
   if(retVal < 0) {
     return retVal;
   }
@@ -813,11 +752,7 @@ RTPReceiver::UpdateStatistics(const WebRtcRTPHeader* rtpHeader,
                               const WebRtc_UWord16 bytes,
                               const bool oldPacket)
 {
-    WebRtc_UWord32 freq = 90000;
-    if(_audio)
-    {
-        freq = AudioFrequency();
-    }
+    WebRtc_UWord32 freq = _rtpMediaReceiver->GetFrequencyHz();
 
     Bitrate::Update(bytes);
 
@@ -915,10 +850,8 @@ bool RTPReceiver::RetransmitOfOldPacket(
   if (InOrderPacket(sequenceNumber)) {
     return false;
   }
-  WebRtc_UWord32 frequencyKHz = 90;  // Video frequency.
-  if (_audio) {
-    frequencyKHz = AudioFrequency() / 1000;
-  }
+
+  WebRtc_UWord32 frequencyKHz = _rtpMediaReceiver->GetFrequencyHz() / 1000;
   WebRtc_Word64 timeDiffMS = _clock.GetTimeInMS() - _lastReceiveTime;
   // Diff in time stamp since last received in order.
   WebRtc_Word32 rtpTimeStampDiffMS = static_cast<WebRtc_Word32>(
@@ -937,7 +870,7 @@ bool RTPReceiver::RetransmitOfOldPacket(
 
     // Min maxDelayMs is 1.
     if (maxDelayMs == 0) {
-      maxDelayMs = 1; 
+      maxDelayMs = 1;
     }
   } else {
     maxDelayMs = (minRTT / 3) + 1;
@@ -1022,11 +955,8 @@ WebRtc_Word32
 RTPReceiver::EstimatedRemoteTimeStamp(WebRtc_UWord32& timestamp) const
 {
     CriticalSectionScoped lock(_criticalSectionRTPReceiver);
-    WebRtc_UWord32 freq = 90000;
-    if(_audio)
-    {
-        freq = AudioFrequency();
-    }
+    WebRtc_UWord32 freq = _rtpMediaReceiver->GetFrequencyHz();
+
     if(_localTimeLastReceivedTimestamp == 0)
     {
         WEBRTC_TRACE(kTraceWarning, kTraceRtpRtcp, _id, "%s invalid state", __FUNCTION__);
@@ -1076,7 +1006,7 @@ void RTPReceiver::CheckSSRCChanged(const WebRtcRTPHeader* rtpHeader) {
   bool newSSRC = false;
   bool reInitializeDecoder = false;
   char payloadName[RTP_PAYLOAD_NAME_SIZE];
-  WebRtc_UWord32 frequency = 90000; // default video freq
+  WebRtc_UWord32 frequency = kDefaultVideoFrequency; // default video freq
   WebRtc_UWord8 channels = 1;
   WebRtc_UWord32 rate = 0;
 
@@ -1116,7 +1046,7 @@ void RTPReceiver::CheckSSRCChanged(const WebRtcRTPHeader* rtpHeader) {
             channels =  payload->typeSpecific.Audio.channels;
             rate = payload->typeSpecific.Audio.rate;
           } else {
-            frequency = 90000;
+            frequency = kDefaultVideoFrequency;
           }
         }
       }
@@ -1146,12 +1076,17 @@ void RTPReceiver::CheckSSRCChanged(const WebRtcRTPHeader* rtpHeader) {
 }
 
 // no criticalsection when called
+// TODO(phoglund): Move as much as possible of this code path into the media
+// specific receivers. Basically this method goes through a lot of trouble to
+// compute something which is only used by the media specific parts later. If
+// this code path moves we can get rid of some of the rtp_receiver ->
+// media_specific interface (such as CheckPayloadChange, possibly get/set
+// last known payload).
 WebRtc_Word32 RTPReceiver::CheckPayloadChanged(
     const WebRtcRTPHeader* rtpHeader,
     const WebRtc_Word8 firstPayloadByte,
     bool& isRED,
-    AudioPayload& audioSpecificPayload,
-    VideoPayload& videoSpecificPayload) {
+    ModuleRTPUtility::PayloadUnion* specificPayload) {
   bool reInitializeDecoder = false;
 
   char payloadName[RTP_PAYLOAD_NAME_SIZE];
@@ -1175,30 +1110,25 @@ WebRtc_Word32 RTPReceiver::CheckPayloadChanged(
 
         //when we receive RED we need to check the real payload type
         if (payloadType == _lastReceivedPayloadType) {
-          if(_audio)
-          {
-            memcpy(&audioSpecificPayload, &_lastReceivedAudioSpecific,
-                   sizeof(_lastReceivedAudioSpecific));
-          } else {
-            memcpy(&videoSpecificPayload, &_lastReceivedVideoSpecific,
-                   sizeof(_lastReceivedVideoSpecific));
-          }
+          _rtpMediaReceiver->GetLastMediaSpecificPayload(specificPayload);
           return 0;
         }
       }
-      if (_audio) {
-        if (TelephoneEventPayloadType(payloadType)) {
-          // don't do callbacks for DTMF packets
-          isRED = false;
-          return 0;
-        }
-        // frequency is updated for CNG
-        if (CNGPayloadType(payloadType, audioSpecificPayload.frequency)) {
-          // don't do callbacks for DTMF packets
-          isRED = false;
-          return 0;
-        }
+      bool shouldResetStatistics = false;
+      bool shouldDiscardChanges = false;
+
+      _rtpMediaReceiver->CheckPayloadChanged(
+          payloadType, specificPayload, &shouldResetStatistics,
+          &shouldDiscardChanges);
+
+      if (shouldResetStatistics) {
+        ResetStatistics();
       }
+      if (shouldDiscardChanges) {
+        isRED = false;
+        return 0;
+      }
+
       std::map<WebRtc_Word8, ModuleRTPUtility::Payload*>::iterator it =
           _payloadTypeMap.find(payloadType);
 
@@ -1210,22 +1140,16 @@ WebRtc_Word32 RTPReceiver::CheckPayloadChanged(
       assert(payload);
       payloadName[RTP_PAYLOAD_NAME_SIZE - 1] = 0;
       strncpy(payloadName, payload->name, RTP_PAYLOAD_NAME_SIZE - 1);
+
       _lastReceivedPayloadType = payloadType;
 
       reInitializeDecoder = true;
 
-      if(payload->audio) {
-        memcpy(&_lastReceivedAudioSpecific, &(payload->typeSpecific.Audio),
-               sizeof(_lastReceivedAudioSpecific));
-        memcpy(&audioSpecificPayload, &(payload->typeSpecific.Audio),
-               sizeof(_lastReceivedAudioSpecific));
-      } else {
-        memcpy(&_lastReceivedVideoSpecific, &(payload->typeSpecific.Video),
-               sizeof(_lastReceivedVideoSpecific));
-        memcpy(&videoSpecificPayload, &(payload->typeSpecific.Video),
-               sizeof(_lastReceivedVideoSpecific));
+      _rtpMediaReceiver->SetLastMediaSpecificPayload(payload->typeSpecific);
+      _rtpMediaReceiver->GetLastMediaSpecificPayload(specificPayload);
 
-        if (_lastReceivedVideoSpecific.videoCodecType == kRtpFecVideo)
+      if(!payload->audio) {
+        if (VideoCodecType() == kRtpFecVideo)
         {
           // Only reset the decoder on media packets.
           reInitializeDecoder = false;
@@ -1242,39 +1166,16 @@ WebRtc_Word32 RTPReceiver::CheckPayloadChanged(
         ResetStatistics();
       }
     } else {
-      if(_audio)
-      {
-        memcpy(&audioSpecificPayload, &_lastReceivedAudioSpecific,
-               sizeof(_lastReceivedAudioSpecific));
-      } else
-      {
-        memcpy(&videoSpecificPayload, &_lastReceivedVideoSpecific,
-               sizeof(_lastReceivedVideoSpecific));
-      }
+      _rtpMediaReceiver->GetLastMediaSpecificPayload(specificPayload);
       isRED = false;
     }
   }   // end critsect
   if (reInitializeDecoder) {
     CriticalSectionScoped lock(_criticalSectionCbs);
     if (_cbRtpFeedback) {
-      // create new decoder instance
-      if(_audio) {
-        if (-1 == _cbRtpFeedback->OnInitializeDecoder(_id, payloadType,
-            payloadName, audioSpecificPayload.frequency,
-            audioSpecificPayload.channels, audioSpecificPayload.rate)) {
-          WEBRTC_TRACE(kTraceError, kTraceRtpRtcp, _id,
-                       "Failed to create audio decoder for payload type:%d",
-                       payloadType);
-          return -1; // Wrong payload type
-        }
-      } else {
-        if (-1 == _cbRtpFeedback->OnInitializeDecoder(_id, payloadType,
-            payloadName, 90000, 1, 0)) {
-          WEBRTC_TRACE(kTraceError, kTraceRtpRtcp, _id,
-                       "Failed to create video decoder for payload type:%d",
-                       payloadType);
-          return -1; // Wrong payload type
-        }
+      if (-1 == _rtpMediaReceiver->InvokeOnInitializeDecoder(
+          _cbRtpFeedback, _id, payloadType, payloadName, *specificPayload)) {
+        return -1;  // Wrong payload type.
       }
     }
   }
@@ -1290,7 +1191,8 @@ void RTPReceiver::CheckCSRC(const WebRtcRTPHeader* rtpHeader) {
   {
     CriticalSectionScoped lock(_criticalSectionRTPReceiver);
 
-    if (TelephoneEventPayloadType(rtpHeader->header.payloadType)) {
+    if (_rtpReceiverAudio->TelephoneEventPayloadType(
+        rtpHeader->header.payloadType)) {
       // Don't do this for DTMF packets
       return;
     }
@@ -1620,4 +1522,5 @@ RTPReceiver::ProcessBitrate()
 
     Bitrate::Process();
 }
+
 } // namespace webrtc

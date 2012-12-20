@@ -21,6 +21,9 @@
 
 #include "structs.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 int WebRtcIsacfix_EstimateBandwidth(BwEstimatorstr   *bwest_str,
                                     Bitstr_dec       *streamdata,
@@ -72,12 +75,23 @@ void WebRtcIsacfix_Time2Spec(WebRtc_Word16 *inre1Q9,
                              WebRtc_Word16 *outre,
                              WebRtc_Word16 *outim);
 
+typedef void (*Spec2Time)(WebRtc_Word16* inreQ7,
+                          WebRtc_Word16* inimQ7,
+                          WebRtc_Word32* outre1Q16,
+                          WebRtc_Word32* outre2Q16);
+extern Spec2Time WebRtcIsacfix_Spec2Time;
 
+void WebRtcIsacfix_Spec2TimeC(WebRtc_Word16* inreQ7,
+                              WebRtc_Word16* inimQ7,
+                              WebRtc_Word32* outre1Q16,
+                              WebRtc_Word32* outre2Q16);
 
-void WebRtcIsacfix_Spec2Time(WebRtc_Word16 *inreQ7,
-                             WebRtc_Word16 *inimQ7,
-                             WebRtc_Word32 *outre1Q16,
-                             WebRtc_Word32 *outre2Q16);
+#if (defined WEBRTC_DETECT_ARM_NEON) || (defined WEBRTC_ARCH_ARM_NEON)
+void WebRtcIsacfix_Spec2TimeNeon(WebRtc_Word16* inreQ7,
+                                 WebRtc_Word16* inimQ7,
+                                 WebRtc_Word32* outre1Q16,
+                                 WebRtc_Word32* outre2Q16);
+#endif
 
 
 
@@ -175,5 +189,9 @@ typedef void (*FilterMaLoopFix)(int16_t input0,
                                 int32_t* ptr1,
                                 int32_t* ptr2);
 extern FilterMaLoopFix WebRtcIsacfix_FilterMaLoopFix;
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif
 
 #endif /* WEBRTC_MODULES_AUDIO_CODING_CODECS_ISAC_FIX_SOURCE_CODEC_H_ */

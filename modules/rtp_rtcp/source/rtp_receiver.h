@@ -19,8 +19,6 @@
 #include "rtp_header_extension.h"
 #include "rtp_rtcp.h"
 #include "rtp_rtcp_defines.h"
-#include "rtp_receiver_audio.h"
-#include "rtp_receiver_video.h"
 #include "rtcp_receiver_help.h"
 #include "Bitrate.h"
 
@@ -28,14 +26,20 @@ namespace webrtc {
 class RtpRtcpFeedback;
 class ModuleRtpRtcpImpl;
 class Trace;
+class RTPReceiverAudio;
+class RTPReceiverVideo;
+class RTPReceiverStrategy;
 
-class RTPReceiver : public RTPReceiverAudio, public RTPReceiverVideo, public Bitrate
+const WebRtc_Word32 kDefaultVideoFrequency = 90000;
+
+class RTPReceiver : public Bitrate
 {
 public:
     RTPReceiver(const WebRtc_Word32 id,
                 const bool audio,
                 RtpRtcpClock* clock,
-                ModuleRtpRtcpImpl* owner);
+                ModuleRtpRtcpImpl* owner,
+                RtpAudioFeedback* incomingMessagesCallback);
 
     virtual ~RTPReceiver();
 
@@ -154,10 +158,17 @@ public:
 
     void RTXStatus(bool* enable, WebRtc_UWord32* SSRC) const;
 
+    RTPReceiverAudio* GetAudioReceiver() const { return _rtpReceiverAudio; }
+
+    virtual WebRtc_Word32 CallbackOfReceivedPayloadData(
+        const WebRtc_UWord8* payloadData,
+        const WebRtc_UWord16 payloadSize,
+        const WebRtcRTPHeader* rtpHeader);
+
+    virtual WebRtc_Word8 REDPayloadType() const;
+
+    bool HaveNotReceivedPackets() const;
 protected:
-    virtual WebRtc_Word32 CallbackOfReceivedPayloadData(const WebRtc_UWord8* payloadData,
-                                                        const WebRtc_UWord16 payloadSize,
-                                                        const WebRtcRTPHeader* rtpHeader);
 
     virtual bool RetransmitOfOldPacket(const WebRtc_UWord16 sequenceNumber,
                                        const WebRtc_UWord32 rtpTimeStamp) const;
@@ -166,8 +177,6 @@ protected:
     void UpdateStatistics(const WebRtcRTPHeader* rtpHeader,
                           const WebRtc_UWord16 bytes,
                           const bool oldPacket);
-
-    virtual WebRtc_Word8 REDPayloadType() const;
 
 private:
     // Is RED configured with payload type payloadType
@@ -180,15 +189,17 @@ private:
     WebRtc_Word32 CheckPayloadChanged(const WebRtcRTPHeader* rtpHeader,
                                       const WebRtc_Word8 firstPayloadByte,
                                       bool& isRED,
-                                      ModuleRTPUtility::AudioPayload& audioSpecific,
-                                      ModuleRTPUtility::VideoPayload& videoSpecific);
+                                      ModuleRTPUtility::PayloadUnion* payload);
 
     void UpdateNACKBitRate(WebRtc_Word32 bytes, WebRtc_UWord32 now);
     bool ProcessNACKBitRate(WebRtc_UWord32 now);
 
 private:
+    RTPReceiverAudio*       _rtpReceiverAudio;
+    RTPReceiverVideo*       _rtpReceiverVideo;
+    RTPReceiverStrategy*    _rtpMediaReceiver;
+
     WebRtc_Word32           _id;
-    const bool              _audio;
     ModuleRtpRtcpImpl&      _rtpRtcp;
 
     CriticalSectionWrapper* _criticalSectionCbs;
@@ -201,14 +212,11 @@ private:
     WebRtc_Word8            _lastReceivedPayloadType;
     WebRtc_Word8            _lastReceivedMediaPayloadType;
 
-    ModuleRTPUtility::AudioPayload _lastReceivedAudioSpecific;
-    ModuleRTPUtility::VideoPayload _lastReceivedVideoSpecific;
-
     WebRtc_UWord32            _packetTimeOutMS;
     WebRtc_Word8              _redPayloadType;
 
-    std::map<WebRtc_Word8, ModuleRTPUtility::Payload*> _payloadTypeMap;
-    RtpHeaderExtensionMap     _rtpHeaderExtensionMap;
+    ModuleRTPUtility::PayloadTypeMap _payloadTypeMap;
+    RtpHeaderExtensionMap            _rtpHeaderExtensionMap;
 
     // SSRCs
     WebRtc_UWord32            _SSRC;
@@ -256,6 +264,7 @@ private:
     bool _RTX;
     WebRtc_UWord32 _ssrcRTX;
 };
+
 } // namespace webrtc
 
 #endif // WEBRTC_MODULES_RTP_RTCP_SOURCE_RTP_RECEIVER_H_

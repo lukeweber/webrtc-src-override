@@ -53,6 +53,7 @@ LOCAL_CFLAGS := \
     # -DWEBRTC_ANDROID_OPENSLES
 
 LOCAL_C_INCLUDES := \
+    $(MY_THIRD_PARTY_PATH) \
     $(LOCAL_PATH)/include \
     $(LOCAL_PATH)/.. \
     $(LOCAL_PATH)/../common_audio/resampler/include \

@@ -40,6 +40,7 @@ LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
 
 LOCAL_C_INCLUDES := \
+    $(MY_THIRD_PARTY_PATH) \
     $(LOCAL_PATH)/../interface \
     $(LOCAL_PATH)/../../codecs/cng/include \
     $(LOCAL_PATH)/../../codecs/g711/include \

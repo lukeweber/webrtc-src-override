@@ -235,10 +235,10 @@ void RunTest(std::string out_path) {
   int codecinput;
   bool AEC = false;
   bool AGC = true;
-  bool AGC1 = false;
+  bool rx_agc = false;
   bool VAD = false;
   bool NS = false;
-  bool NS1 = false;
+  bool rx_ns = false;
   bool typing_detection = false;
   bool muted = false;
   bool on_hold = false;
@@ -340,8 +340,10 @@ void RunTest(std::string out_path) {
     if (strncmp(cinst.plname, "ISAC", 4) == 0 && cinst.plfreq == 32000) {
       printf("%i. ISAC-swb pltype:%i plfreq:%i channels:%i\n", i, cinst.pltype,
              cinst.plfreq, cinst.channels);
-    }
-    else {
+    } else if (strncmp(cinst.plname, "ISAC", 4) == 0 && cinst.plfreq == 48000) {
+      printf("%i. ISAC-fb pltype:%i plfreq:%i channels:%i\n", i, cinst.pltype,
+                   cinst.plfreq, cinst.channels);
+    } else {
       printf("%i. %s pltype:%i plfreq:%i channels:%i\n", i, cinst.plname,
              cinst.pltype, cinst.plfreq, cinst.channels);
     }
@@ -677,20 +679,20 @@ void RunTest(std::string out_path) {
       }
       else if (codecinput == (noCodecs + 14)) {
         // Remote AGC
-        AGC1 = !AGC1;
-        res = apm->SetRxAgcStatus(chan, AGC1);
+        rx_agc = !rx_agc;
+        res = apm->SetRxAgcStatus(chan, rx_agc);
         VALIDATE;
-        if (AGC1)
+        if (rx_agc)
           printf("\n Receive-side AGC is now on! \n");
         else
           printf("\n Receive-side AGC is now off! \n");
       }
       else if (codecinput == (noCodecs + 15)) {
         // Remote NS
-        NS1 = !NS1;
-        res = apm->SetRxNsStatus(chan, NS);
+        rx_ns = !rx_ns;
+        res = apm->SetRxNsStatus(chan, rx_ns);
         VALIDATE;
-        if (NS1)
+        if (rx_ns)
           printf("\n Receive-side NS is now on! \n");
         else
           printf("\n Receive-side NS is now off! \n");

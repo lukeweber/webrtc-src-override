@@ -61,6 +61,7 @@ LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
 
 LOCAL_C_INCLUDES := \
+    $(MY_THIRD_PARTY_PATH) \
     $(LOCAL_PATH)/../interface \
     $(LOCAL_PATH)/../../../../../.. \
     $(LOCAL_PATH)/../../../../../../common_audio/signal_processing/include
@@ -88,9 +89,11 @@ LOCAL_MODULE_CLASS := STATIC_LIBRARIES
 LOCAL_MODULE := libwebrtc_isacfix_neon
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := \
-    filters_neon.c \
+    filterbanks_neon.S \
+    filters_neon.S \
     lattice_neon.S \
-    lpc_masking_model_neon.S
+    lpc_masking_model_neon.S \
+    transform_neon.S
 
 # Flags passed to both C and C++ files.
 LOCAL_CFLAGS := \
@@ -100,6 +103,7 @@ LOCAL_CFLAGS := \
     -flax-vector-conversions
 
 LOCAL_C_INCLUDES := \
+    $(MY_THIRD_PARTY_PATH) \
     $(LOCAL_PATH)/../interface \
     $(LOCAL_PATH)/../../../../../.. \
     $(LOCAL_PATH)/../../../../../../common_audio/signal_processing/include
@@ -115,36 +119,38 @@ endif # ifeq ($(WEBRTC_BUILD_NEON_LIBS),true)
 ###########################
 # isac test app
 
-include $(CLEAR_VARS)
+# include $(CLEAR_VARS)
 
-LOCAL_MODULE_TAGS := tests
-LOCAL_CPP_EXTENSION := .cc
-LOCAL_SRC_FILES:= ../test/kenny.c
+# LOCAL_MODULE_TAGS := tests
+# LOCAL_CPP_EXTENSION := .cc
+# LOCAL_SRC_FILES:= ../test/kenny.cc
 
 # Flags passed to both C and C++ files.
-LOCAL_CFLAGS := $(MY_WEBRTC_COMMON_DEFS)
+# LOCAL_CFLAGS := $(MY_WEBRTC_COMMON_DEFS)
 
-LOCAL_C_INCLUDES := \
-    $(LOCAL_PATH)/../interface \
-    $(LOCAL_PATH)/../../../../../..
+# LOCAL_C_INCLUDES := \
+    # $(MY_THIRD_PARTY_PATH) \
+    # $(LOCAL_PATH)/../interface \
+    # $(LOCAL_PATH)/../../../../../..
 
-LOCAL_STATIC_LIBRARIES := \
-    libwebrtc_isacfix \
-    libwebrtc_spl \
-    libwebrtc_system_wrappers
+# LOCAL_STATIC_LIBRARIES := \
+    # libwebrtc_isacfix \
+    # libwebrtc_spl \
+    # libwebrtc_system_wrappers \
+    # libwebrtc_test_support
 
-ifeq ($(WEBRTC_BUILD_NEON_LIBS),true)
-LOCAL_STATIC_LIBRARIES += \
-    libwebrtc_isacfix_neon
-endif
+# ifeq ($(WEBRTC_BUILD_NEON_LIBS),true)
+# LOCAL_STATIC_LIBRARIES += \
+    # libwebrtc_isacfix_neon
+# endif
 
-LOCAL_SHARED_LIBRARIES := \
-    libutils
+# LOCAL_SHARED_LIBRARIES := \
+    # libutils
 
-LOCAL_MODULE:= webrtc_isac_test
+# LOCAL_MODULE:= webrtc_isac_test
 
-ifdef NDK_ROOT
-include $(BUILD_EXECUTABLE)
-else
-include $(BUILD_NATIVE_TEST)
-endif
+# ifdef NDK_ROOT
+# include $(BUILD_EXECUTABLE)
+# else
+# include $(BUILD_NATIVE_TEST)
+# endif

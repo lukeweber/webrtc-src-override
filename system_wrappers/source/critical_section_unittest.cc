@@ -8,6 +8,8 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
+#include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
+
 #ifdef _WIN32
 // For Sleep()
 #include <windows.h>
@@ -16,21 +18,17 @@
 #include <time.h>
 #endif
 
-#include "system_wrappers/interface/critical_section_wrapper.h"
-
 #include "gtest/gtest.h"
-#include "system_wrappers/interface/sleep.h"
-#include "system_wrappers/interface/thread_wrapper.h"
-#include "system_wrappers/interface/trace.h"
-#include "system_wrappers/source/unittest_utilities.h"
+#include "webrtc/system_wrappers/interface/sleep.h"
+#include "webrtc/system_wrappers/interface/thread_wrapper.h"
+#include "webrtc/system_wrappers/interface/trace.h"
+#include "webrtc/system_wrappers/source/unittest_utilities.h"
 
 namespace webrtc {
 
 namespace {
 
 const bool kLogTrace = false;  // Set to true to enable debug logging to stdout.
-
-#define LOG(...) WEBRTC_TRACE(kTraceStateInfo, kTraceUtility, -1, __VA_ARGS__);
 
 // Cause a process switch. Needed to avoid depending on
 // busy-wait in tests.
@@ -41,7 +39,7 @@ static void SwitchProcess() {
 }
 
 class ProtectedCount {
- public:
+public:
   explicit ProtectedCount(CriticalSectionWrapper* crit_sect)
     : crit_sect_(crit_sect),
       count_(0) {
@@ -50,7 +48,6 @@ class ProtectedCount {
   void Increment() {
     CriticalSectionScoped cs(crit_sect_);
     ++count_;
-    LOG("Inc to %d", count_);
   }
 
   int Count() const {
@@ -58,13 +55,13 @@ class ProtectedCount {
     return count_;
   }
 
- private:
+private:
   CriticalSectionWrapper* crit_sect_;
   int count_;
 };
 
 class CritSectTest : public ::testing::Test {
- public:
+public:
   CritSectTest() : trace_(kLogTrace) {
   }
 
@@ -75,30 +72,26 @@ class CritSectTest : public ::testing::Test {
     // On Posix, this SwitchProcess() needs to be in a loop to make the
     // test both fast and non-flaky.
     // With 1 us wait as the switch, up to 7 rounds have been observed.
-    while (count->Count() < target && loop_counter < 100*target) {
+    while (count->Count() < target && loop_counter < 100 * target) {
       ++loop_counter;
       SwitchProcess();
     }
-    LOG("Test looped %d times\n", loop_counter);
     return (count->Count() >= target);
   }
 
- private:
+private:
   ScopedTracing trace_;
 };
 
 bool LockUnlockThenStopRunFunction(void* obj) {
-  LOG("Wait starting");
-  ProtectedCount* the_count = static_cast<ProtectedCount*> (obj);
-  LOG("Wait incrementing");
+  ProtectedCount* the_count = static_cast<ProtectedCount*>(obj);
   the_count->Increment();
-  LOG("Wait returning");
   return false;
 }
 
 TEST_F(CritSectTest, ThreadWakesOnce) {
-  CriticalSectionWrapper* crit_sect
-      = CriticalSectionWrapper::CreateCriticalSection();
+  CriticalSectionWrapper* crit_sect =
+      CriticalSectionWrapper::CreateCriticalSection();
   ProtectedCount count(crit_sect);
   ThreadWrapper* thread = ThreadWrapper::CreateThread(
       &LockUnlockThenStopRunFunction, &count);
@@ -119,18 +112,15 @@ TEST_F(CritSectTest, ThreadWakesOnce) {
 }
 
 bool LockUnlockRunFunction(void* obj) {
-  LOG("Wait starting");
-  ProtectedCount* the_count = static_cast<ProtectedCount*> (obj);
-  LOG("Wait incrementing");
+  ProtectedCount* the_count = static_cast<ProtectedCount*>(obj);
   the_count->Increment();
   SwitchProcess();
-  LOG("Wait returning");
   return true;
 }
 
 TEST_F(CritSectTest, ThreadWakesTwice) {
-  CriticalSectionWrapper* crit_sect
-      = CriticalSectionWrapper::CreateCriticalSection();
+  CriticalSectionWrapper* crit_sect =
+      CriticalSectionWrapper::CreateCriticalSection();
   ProtectedCount count(crit_sect);
   ThreadWrapper* thread = ThreadWrapper::CreateThread(&LockUnlockRunFunction,
                                                       &count);

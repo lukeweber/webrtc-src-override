@@ -233,7 +233,6 @@ class AudioDeviceAndroidJni : public AudioDeviceGeneric {
 
   // JNI and Java
   JavaVM* _javaVM; // denotes a Java VM
-  jobject _javaContext; // the application context
 
   JNIEnv* _jniEnvPlay; // The JNI env for playout thread
   JNIEnv* _jniEnvRec; // The JNI env for recording thread

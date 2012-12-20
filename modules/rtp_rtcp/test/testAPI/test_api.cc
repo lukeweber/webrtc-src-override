@@ -24,7 +24,7 @@ class RtpRtcpAPITest : public ::testing::Test {
  protected:
   RtpRtcpAPITest() {
     test_CSRC[0] = 1234;
-    test_CSRC[2] = 2345;
+    test_CSRC[1] = 2345;
     test_id = 123;
     test_ssrc = 3456;
     test_timestamp = 4567;
@@ -89,12 +89,6 @@ TEST_F(RtpRtcpAPITest, CSRC) {
   EXPECT_EQ(2, module->CSRCs(testOfCSRC));
   EXPECT_EQ(test_CSRC[0], testOfCSRC[0]);
   EXPECT_EQ(test_CSRC[1], testOfCSRC[1]);
-}
-
-TEST_F(RtpRtcpAPITest, TrafficSmoothing) {
-  EXPECT_FALSE(module->TransmissionSmoothingStatus());
-  module->SetTransmissionSmoothingStatus(true);
-  EXPECT_TRUE(module->TransmissionSmoothingStatus());
 }
 
 TEST_F(RtpRtcpAPITest, RTCP) {

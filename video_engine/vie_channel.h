@@ -31,10 +31,14 @@
 
 namespace webrtc {
 
+class ChannelStatsObserver;
 class CriticalSectionWrapper;
 class Encryption;
+class PacedSender;
 class ProcessThread;
 class RtpRtcp;
+class RtcpRttObserver;
+class StatsObserver;
 class ThreadWrapper;
 class VideoCodingModule;
 class VideoDecoder;
@@ -56,6 +60,8 @@ class ViEChannel
       public RtpFeedback,
       public ViEFrameProviderBase {
  public:
+  friend class ChannelStatsObserver;
+
   ViEChannel(WebRtc_Word32 channel_id,
              WebRtc_Word32 engine_id,
              WebRtc_UWord32 number_of_cores,
@@ -63,6 +69,8 @@ class ViEChannel
              RtcpIntraFrameObserver* intra_frame_observer,
              RtcpBandwidthObserver* bandwidth_observer,
              RemoteBitrateEstimator* remote_bitrate_estimator,
+             RtcpRttObserver* rtt_observer,
+             PacedSender* paced_sender,
              RtpRtcp* default_rtp_rtcp,
              bool sender);
   ~ViEChannel();
@@ -87,6 +95,9 @@ class ViEChannel
   WebRtc_Word32 ReceiveCodecStatistics(WebRtc_UWord32* num_key_frames,
                                        WebRtc_UWord32* num_delta_frames);
   WebRtc_UWord32 DiscardedPackets() const;
+
+  // Returns the estimated delay in milliseconds.
+  int ReceiveDelay() const;
 
   // Only affects calls to SetReceiveCodec done after this call.
   WebRtc_Word32 WaitForKeyFrame(bool wait);
@@ -295,6 +306,8 @@ class ViEChannel
   // Gets the modules used by the channel.
   RtpRtcp* rtp_rtcp();
 
+  StatsObserver* GetStatsObserver();
+
   // Implements VCMReceiveCallback.
   virtual WebRtc_Word32 FrameToRender(I420VideoFrame& video_frame);  // NOLINT
 
@@ -340,6 +353,8 @@ class ViEChannel
   static bool ChannelDecodeThreadFunction(void* obj);
   bool ChannelDecodeProcess();
 
+  void OnRttUpdate(uint32_t rtt);
+
  private:
   // Assumed to be protected.
   WebRtc_Word32 StartDecodeThread();
@@ -372,6 +387,9 @@ class ViEChannel
   ViESender vie_sender_;
   ViESyncModule vie_sync_;
 
+  // Helper to report call statistics.
+  scoped_ptr<ChannelStatsObserver> stats_observer_;
+
   // Not owned.
   ProcessThread& module_process_thread_;
   ViEDecoderObserver* codec_observer_;
@@ -380,6 +398,9 @@ class ViEChannel
   ViERTCPObserver* rtcp_observer_;
   ViENetworkObserver* networkObserver_;
   RtcpIntraFrameObserver* intra_frame_observer_;
+  RtcpRttObserver* rtt_observer_;
+  PacedSender* paced_sender_;
+
   scoped_ptr<RtcpBandwidthObserver> bandwidth_observer_;
   bool rtp_packet_timeout_;
   int send_timestamp_extension_id_;
@@ -395,9 +416,6 @@ class ViEChannel
 
   ViEEffectFilter* effect_filter_;
   bool color_enhancement_;
-
-  // Time when RTT time was last reported to VCM JB.
-  TickTime vcm_rttreported_;
 
   ViEFileRecorder file_recorder_;
 

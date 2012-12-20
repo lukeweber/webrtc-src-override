@@ -14,25 +14,14 @@
       'type': 'executable',
       'dependencies': [
         'iSACFix',
+        '<(webrtc_root)/test/test.gyp:test_support',
       ],
       'include_dirs': [
         './fix/test',
         './fix/interface',
       ],
       'sources': [
-        './fix/test/kenny.c',
-      ],
-    },
-    {
-      'target_name': 'isacfix_unittests',
-      'type': 'executable',
-      'dependencies': [
-        'iSACFix',
-        '<(DEPTH)/testing/gtest.gyp:gtest',
-        '<(webrtc_root)/test/test.gyp:test_support_main',
-      ],
-      'sources': [
-        'fix/test/isacfix_unittest.cc',
+        './fix/test/kenny.cc',
       ],
     },
   ],

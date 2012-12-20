@@ -12,10 +12,11 @@
 
 #include "video_engine/test/auto_test/interface/vie_autotest_defines.h"
 #include "video_engine/test/auto_test/primitives/base_primitives.h"
-#include "video_engine/test/auto_test/primitives/codec_primitives.h"
 #include "video_engine/test/auto_test/primitives/framedrop_primitives.h"
 #include "video_engine/test/auto_test/primitives/general_primitives.h"
+#include "video_engine/test/libvietest/include/tb_external_transport.h"
 #include "video_engine/test/libvietest/include/tb_interfaces.h"
+#include "video_engine/test/libvietest/include/vie_external_render_filter.h"
 #include "video_engine/test/libvietest/include/vie_fake_camera.h"
 #include "video_engine/test/libvietest/include/vie_to_file_renderer.h"
 
@@ -47,12 +48,19 @@ bool ViEFileBasedComparisonTests::TestCallSetup(
   EXPECT_EQ(0, interfaces.capture->ConnectCaptureDevice(
       capture_id, video_channel));
 
-  ConfigureRtpRtcp(interfaces.rtp_rtcp, video_channel);
+  ConfigureRtpRtcp(interfaces.rtp_rtcp, kNack, video_channel);
 
-  webrtc::ViERender *render_interface = interfaces.render;
+  webrtc::ViERender* render_interface = interfaces.render;
+  webrtc::ViEImageProcess* image_process = interfaces.image_process;
 
-  RenderToFile(render_interface, capture_id, local_file_renderer);
   RenderToFile(render_interface, video_channel, remote_file_renderer);
+
+  // We make a special hookup of the local renderer to use an effect filter
+  // instead of using the render interface for the capture device. This way
+  // we will only render frames that actually get sent.
+  webrtc::ExternalRendererEffectFilter renderer_filter(local_file_renderer);
+  EXPECT_EQ(0, image_process->RegisterSendEffectFilter(video_channel,
+                                                       renderer_filter));
 
   // Run the test itself:
   const char* device_name = "Fake Capture Device";
@@ -61,12 +69,8 @@ bool ViEFileBasedComparisonTests::TestCallSetup(
                       interfaces.base, interfaces.network, video_channel,
                       device_name);
 
-  AutoTestSleep(KAutoTestSleepTimeMs);
-
-  EXPECT_EQ(0, interfaces.base->StopReceive(video_channel));
-
-  StopAndRemoveRenderers(interfaces.base, render_interface, video_channel,
-                         capture_id);
+  EXPECT_EQ(0, render_interface->StopRender(video_channel));
+  EXPECT_EQ(0, render_interface->RemoveRenderer(video_channel));
 
   interfaces.capture->DisconnectCaptureDevice(video_channel);
 
@@ -75,45 +79,9 @@ bool ViEFileBasedComparisonTests::TestCallSetup(
   // tests that the system doesn't mind that the external capture device sends
   // data after rendering has been stopped.
   fake_camera.StopCamera();
+  EXPECT_EQ(0, image_process->DeregisterSendEffectFilter(video_channel));
 
   EXPECT_EQ(0, interfaces.base->DeleteChannel(video_channel));
-  return true;
-}
-
-bool ViEFileBasedComparisonTests::TestCodecs(
-    const std::string& i420_video_file,
-    int width,
-    int height,
-    ViEToFileRenderer* local_file_renderer,
-    ViEToFileRenderer* remote_file_renderer) {
-
-  TbInterfaces interfaces("TestCodecs");
-
-  ViEFakeCamera fake_camera(interfaces.capture);
-  if (!fake_camera.StartCameraInNewThread(i420_video_file, width, height)) {
-    // No point in continuing if we have no proper video source
-    ADD_FAILURE() << "Could not open input video " << i420_video_file <<
-        ": aborting test...";
-    return false;
-  }
-
-  int video_channel = -1;
-  int capture_id = fake_camera.capture_id();
-
-  EXPECT_EQ(0, interfaces.base->CreateChannel(video_channel));
-  EXPECT_EQ(0, interfaces.capture->ConnectCaptureDevice(
-      capture_id, video_channel));
-
-  ConfigureRtpRtcp(interfaces.rtp_rtcp, video_channel);
-
-  RenderToFile(interfaces.render, capture_id, local_file_renderer);
-  RenderToFile(interfaces.render, video_channel, remote_file_renderer);
-
-  // Force the codec resolution to what our input video is so we can make
-  // comparisons later. Our comparison algorithms wouldn't like scaling.
-  ::TestCodecs(interfaces, capture_id, video_channel, width, height);
-
-  fake_camera.StopCamera();
   return true;
 }
 
@@ -122,8 +90,8 @@ void ViEFileBasedComparisonTests::TestFullStack(
     int width,
     int height,
     int bit_rate_kbps,
-    int packet_loss_percent,
-    int network_delay_ms,
+    ProtectionMethod protection_method,
+    const NetworkParameters& network,
     ViEToFileRenderer* local_file_renderer,
     ViEToFileRenderer* remote_file_renderer,
     FrameDropDetector* frame_drop_detector) {
@@ -148,12 +116,10 @@ void ViEFileBasedComparisonTests::TestFullStack(
 
   EXPECT_EQ(0, interfaces.capture->ConnectCaptureDevice(
       capture_id, video_channel));
-  ConfigureRtpRtcp(interfaces.rtp_rtcp, video_channel);
-  RenderToFile(interfaces.render, capture_id, local_file_renderer);
-  RenderToFile(interfaces.render, video_channel, remote_file_renderer);
+  ConfigureRtpRtcp(interfaces.rtp_rtcp, protection_method, video_channel);
 
   ::TestFullStack(interfaces, capture_id, video_channel, width, height,
-                  bit_rate_kbps, packet_loss_percent, network_delay_ms,
-                  frame_drop_detector);
+                  bit_rate_kbps, network, frame_drop_detector,
+                  remote_file_renderer, local_file_renderer);
   EXPECT_TRUE(fake_camera.StopCamera());
 }

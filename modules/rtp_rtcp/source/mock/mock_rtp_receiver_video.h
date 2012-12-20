@@ -17,7 +17,7 @@ namespace webrtc {
 
 class MockRTPReceiverVideo : public RTPReceiverVideo {
  public:
-  MockRTPReceiverVideo() : RTPReceiverVideo(0, NULL) {}
+  MockRTPReceiverVideo() : RTPReceiverVideo(0, NULL, NULL) {}
   MOCK_METHOD1(ChangeUniqueId,
       void(const WebRtc_Word32 id));
   MOCK_METHOD3(ReceiveRecoveredPacketCallback,
@@ -40,6 +40,8 @@ class MockRTPReceiverVideo : public RTPReceiverVideo {
            const WebRtc_UWord32 rtpTimeStamp));
   MOCK_CONST_METHOD0(REDPayloadType,
       WebRtc_Word8());
+  MOCK_CONST_METHOD0(HaveNotReceivedPackets,
+        bool());
 };
 
 }  // namespace webrtc

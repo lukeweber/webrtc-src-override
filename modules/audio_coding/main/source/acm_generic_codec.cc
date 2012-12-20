@@ -8,16 +8,17 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
+#include "webrtc/modules/audio_coding/main/source/acm_generic_codec.h"
+
 #include <assert.h>
 #include <string.h>
 
-#include "acm_codec_database.h"
-#include "acm_common_defs.h"
-#include "acm_generic_codec.h"
-#include "acm_neteq.h"
-#include "trace.h"
-#include "webrtc_vad.h"
-#include "webrtc_cng.h"
+#include "webrtc/common_audio/vad/include/webrtc_vad.h"
+#include "webrtc/modules/audio_coding/codecs/cng/include/webrtc_cng.h"
+#include "webrtc/modules/audio_coding/main/source/acm_codec_database.h"
+#include "webrtc/modules/audio_coding/main/source/acm_common_defs.h"
+#include "webrtc/modules/audio_coding/main/source/acm_neteq.h"
+#include "webrtc/system_wrappers/interface/trace.h"
 
 namespace webrtc {
 
@@ -27,302 +28,298 @@ enum {
   kNewCNGNumPLCParams = 8
 };
 
-#define ACM_SID_INTERVAL_MSEC 100
+// Interval for sending new CNG parameters (SID frames) is 100 msec.
+enum {
+  kCngSidIntervalMsec = 100
+};
 
 // We set some of the variables to invalid values as a check point
 // if a proper initialization has happened. Another approach is
 // to initialize to a default codec that we are sure is always included.
 ACMGenericCodec::ACMGenericCodec()
-    : _inAudioIxWrite(0),
-      _inAudioIxRead(0),
-      _inTimestampIxWrite(0),
-      _inAudio(NULL),
-      _inTimestamp(NULL),
-      _frameLenSmpl(-1),  // invalid value
-      _noChannels(1),
-      _codecID(-1),  // invalid value
-      _noMissedSamples(0),
-      _encoderExist(false),
-      _decoderExist(false),
-      _encoderInitialized(false),
-      _decoderInitialized(false),
-      _registeredInNetEq(false),
-      _hasInternalDTX(false),
-      _ptrVADInst(NULL),
-      _vadEnabled(false),
-      _vadMode(VADNormal),
-      _dtxEnabled(false),
-      _ptrDTXInst(NULL),
-      _numLPCParams(kNewCNGNumPLCParams),
-      _sentCNPrevious(false),
-      _isMaster(true),
-      _prev_frame_cng(0),
-      _netEqDecodeLock(NULL),
-      _codecWrapperLock(*RWLockWrapper::CreateRWLock()),
-      _lastEncodedTimestamp(0),
-      _lastTimestamp(0xD87F3F9F),
-      _isAudioBuffFresh(true),
-      _uniqueID(0) {
+    : in_audio_ix_write_(0),
+      in_audio_ix_read_(0),
+      in_timestamp_ix_write_(0),
+      in_audio_(NULL),
+      in_timestamp_(NULL),
+      frame_len_smpl_(-1),  // invalid value
+      num_channels_(1),
+      codec_id_(-1),  // invalid value
+      num_missed_samples_(0),
+      encoder_exist_(false),
+      decoder_exist_(false),
+      encoder_initialized_(false),
+      decoder_initialized_(false),
+      registered_in_neteq_(false),
+      has_internal_dtx_(false),
+      ptr_vad_inst_(NULL),
+      vad_enabled_(false),
+      vad_mode_(VADNormal),
+      dtx_enabled_(false),
+      ptr_dtx_inst_(NULL),
+      num_lpc_params_(kNewCNGNumPLCParams),
+      sent_cn_previous_(false),
+      is_master_(true),
+      prev_frame_cng_(0),
+      neteq_decode_lock_(NULL),
+      codec_wrapper_lock_(*RWLockWrapper::CreateRWLock()),
+      last_encoded_timestamp_(0),
+      last_timestamp_(0xD87F3F9F),
+      is_audio_buff_fresh_(true),
+      unique_id_(0) {
   // Initialize VAD vector.
   for (int i = 0; i < MAX_FRAME_SIZE_10MSEC; i++) {
-    _vadLabel[i] = 0;
+    vad_label_[i] = 0;
   }
-
   // Nullify memory for encoder and decoder, and set payload type to an
   // invalid value.
-  memset(&_encoderParams, 0, sizeof(WebRtcACMCodecParams));
-  _encoderParams.codecInstant.pltype = -1;
-  memset(&_decoderParams, 0, sizeof(WebRtcACMCodecParams));
-  _decoderParams.codecInstant.pltype = -1;
+  memset(&encoder_params_, 0, sizeof(WebRtcACMCodecParams));
+  encoder_params_.codec_inst.pltype = -1;
+  memset(&decoder_params_, 0, sizeof(WebRtcACMCodecParams));
+  decoder_params_.codec_inst.pltype = -1;
 }
 
 ACMGenericCodec::~ACMGenericCodec() {
-  // Check all the members which are pointers and
-  // if they are not NULL delete/free them.
-
-  if (_ptrVADInst != NULL) {
-    WebRtcVad_Free(_ptrVADInst);
-    _ptrVADInst = NULL;
+  // Check all the members which are pointers, and if they are not NULL
+  // delete/free them.
+  if (ptr_vad_inst_ != NULL) {
+    WebRtcVad_Free(ptr_vad_inst_);
+    ptr_vad_inst_ = NULL;
   }
-
-  if (_inAudio != NULL) {
-    delete[] _inAudio;
-    _inAudio = NULL;
+  if (in_audio_ != NULL) {
+    delete[] in_audio_;
+    in_audio_ = NULL;
   }
-
-  if (_inTimestamp != NULL) {
-    delete[] _inTimestamp;
-    _inTimestamp = NULL;
+  if (in_timestamp_ != NULL) {
+    delete[] in_timestamp_;
+    in_timestamp_ = NULL;
   }
-  if (_ptrDTXInst != NULL) {
-    WebRtcCng_FreeEnc(_ptrDTXInst);
-    _ptrDTXInst = NULL;
+  if (ptr_dtx_inst_ != NULL) {
+    WebRtcCng_FreeEnc(ptr_dtx_inst_);
+    ptr_dtx_inst_ = NULL;
   }
-  delete &_codecWrapperLock;
+  delete &codec_wrapper_lock_;
 }
 
-WebRtc_Word32 ACMGenericCodec::Add10MsData(const WebRtc_UWord32 timestamp,
-                                           const WebRtc_Word16* data,
-                                           const WebRtc_UWord16 lengthSmpl,
-                                           const WebRtc_UWord8 audioChannel) {
-  WriteLockScoped wl(_codecWrapperLock);
-  return Add10MsDataSafe(timestamp, data, lengthSmpl, audioChannel);
+int32_t ACMGenericCodec::Add10MsData(const uint32_t timestamp,
+                                     const int16_t* data,
+                                     const uint16_t length_smpl,
+                                     const uint8_t audio_channel) {
+  WriteLockScoped wl(codec_wrapper_lock_);
+  return Add10MsDataSafe(timestamp, data, length_smpl, audio_channel);
 }
 
-WebRtc_Word32 ACMGenericCodec::Add10MsDataSafe(
-    const WebRtc_UWord32 timestamp, const WebRtc_Word16* data,
-    const WebRtc_UWord16 lengthSmpl, const WebRtc_UWord8 audioChannel) {
-  // The codec expects to get data in correct sampling rate.
-  // get the sampling frequency of the codec
-  WebRtc_UWord16 plFreqHz;
-
-  if (EncoderSampFreq(plFreqHz) < 0) {
-    // _codecID is not correct, perhaps the codec is not initialized yet.
+int32_t ACMGenericCodec::Add10MsDataSafe(const uint32_t timestamp,
+                                         const int16_t* data,
+                                         const uint16_t length_smpl,
+                                         const uint8_t audio_channel) {
+  // The codec expects to get data in correct sampling rate. Get the sampling
+  // frequency of the codec.
+  uint16_t plfreq_hz;
+  if (EncoderSampFreq(plfreq_hz) < 0) {
     return -1;
   }
 
-  // Sanity check, if the length of the input corresponds to 10 ms.
-  if ((plFreqHz / 100) != lengthSmpl) {
-    // This is not 10 ms of audio, given the sampling frequency of the
-    // codec
+  // Sanity check to make sure the length of the input corresponds to 10 ms.
+  if ((plfreq_hz / 100) != length_smpl) {
+    // This is not 10 ms of audio, given the sampling frequency of the codec.
     return -1;
   }
-  if (_lastTimestamp == timestamp) {
+
+  if (last_timestamp_ == timestamp) {
     // Same timestamp as the last time, overwrite.
-    if ((_inAudioIxWrite >= lengthSmpl * audioChannel) &&
-        (_inTimestampIxWrite > 0)) {
-      _inAudioIxWrite -= lengthSmpl * audioChannel;
-      _inTimestampIxWrite--;
-      WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceAudioCoding, _uniqueID,
-          "Adding 10ms with previous timestamp, overwriting the previous 10ms");
+    if ((in_audio_ix_write_ >= length_smpl * audio_channel) &&
+        (in_timestamp_ix_write_ > 0)) {
+      in_audio_ix_write_ -= length_smpl * audio_channel;
+      in_timestamp_ix_write_--;
+      WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceAudioCoding, unique_id_,
+                   "Adding 10ms with previous timestamp, overwriting the "
+                   "previous 10ms");
     } else {
-      WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceAudioCoding, _uniqueID,
+      WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceAudioCoding, unique_id_,
                    "Adding 10ms with previous timestamp, this will sound bad");
     }
   }
 
-  _lastTimestamp = timestamp;
+  last_timestamp_ = timestamp;
 
-  if ((_inAudioIxWrite + lengthSmpl * audioChannel) > AUDIO_BUFFER_SIZE_W16) {
-    // Get the number of samples to be overwritten
-    WebRtc_Word16 missedSamples = _inAudioIxWrite + lengthSmpl * audioChannel-
-    AUDIO_BUFFER_SIZE_W16;
+  // If the data exceeds the buffer size, we throw away the oldest data and
+  // add the newly received 10 msec at the end.
+  if ((in_audio_ix_write_ + length_smpl * audio_channel) >
+      AUDIO_BUFFER_SIZE_W16) {
+    // Get the number of samples to be overwritten.
+    int16_t missed_samples = in_audio_ix_write_ + length_smpl * audio_channel -
+        AUDIO_BUFFER_SIZE_W16;
 
-    // Move the data (overwite the old data)
-    memmove(_inAudio, _inAudio + missedSamples,
-            (AUDIO_BUFFER_SIZE_W16 - lengthSmpl * audioChannel) *
-            sizeof(WebRtc_Word16));
-    // Copy the new data
-    memcpy(_inAudio + (AUDIO_BUFFER_SIZE_W16 - lengthSmpl * audioChannel), data,
-           lengthSmpl * audioChannel * sizeof(WebRtc_Word16));
+    // Move the data (overwrite the old data).
+    memmove(in_audio_, in_audio_ + missed_samples,
+            (AUDIO_BUFFER_SIZE_W16 - length_smpl * audio_channel) *
+            sizeof(int16_t));
 
-    // Get the number of 10 ms blocks which are overwritten
-    WebRtc_Word16 missed10MsecBlocks = (WebRtc_Word16)(
-        (missedSamples / audioChannel * 100) / plFreqHz);
+    // Copy the new data.
+    memcpy(in_audio_ + (AUDIO_BUFFER_SIZE_W16 - length_smpl * audio_channel),
+           data, length_smpl * audio_channel * sizeof(int16_t));
 
-    // Move the timestamps
-    memmove(_inTimestamp, _inTimestamp + missed10MsecBlocks,
-            (_inTimestampIxWrite - missed10MsecBlocks) *
-            sizeof(WebRtc_UWord32));
-    _inTimestampIxWrite -= missed10MsecBlocks;
-    _inTimestamp[_inTimestampIxWrite] = timestamp;
-    _inTimestampIxWrite++;
+    // Get the number of 10 ms blocks which are overwritten.
+    int16_t missed_10ms_blocks =static_cast<int16_t>(
+        (missed_samples / audio_channel * 100) / plfreq_hz);
 
-    // Buffer is full
-    _inAudioIxWrite = AUDIO_BUFFER_SIZE_W16;
-    IncreaseNoMissedSamples(missedSamples);
-    _isAudioBuffFresh = false;
-    return -missedSamples;
+    // Move the timestamps.
+    memmove(in_timestamp_, in_timestamp_ + missed_10ms_blocks,
+            (in_timestamp_ix_write_ - missed_10ms_blocks) * sizeof(uint32_t));
+    in_timestamp_ix_write_ -= missed_10ms_blocks;
+    in_timestamp_[in_timestamp_ix_write_] = timestamp;
+    in_timestamp_ix_write_++;
+
+    // Buffer is full.
+    in_audio_ix_write_ = AUDIO_BUFFER_SIZE_W16;
+    IncreaseNoMissedSamples(missed_samples);
+    is_audio_buff_fresh_ = false;
+    return -missed_samples;
   }
-  memcpy(_inAudio + _inAudioIxWrite, data,
-         lengthSmpl * audioChannel * sizeof(WebRtc_Word16));
-  _inAudioIxWrite += lengthSmpl * audioChannel;
 
-  assert(_inTimestampIxWrite < TIMESTAMP_BUFFER_SIZE_W32);
-  assert(_inTimestampIxWrite >= 0);
+  // Store the input data in our data buffer.
+  memcpy(in_audio_ + in_audio_ix_write_, data,
+         length_smpl * audio_channel * sizeof(int16_t));
+  in_audio_ix_write_ += length_smpl * audio_channel;
 
-  _inTimestamp[_inTimestampIxWrite] = timestamp;
-  _inTimestampIxWrite++;
-  _isAudioBuffFresh = false;
+  assert(in_timestamp_ix_write_ < TIMESTAMP_BUFFER_SIZE_W32);
+  assert(in_timestamp_ix_write_ >= 0);
+
+  in_timestamp_[in_timestamp_ix_write_] = timestamp;
+  in_timestamp_ix_write_++;
+  is_audio_buff_fresh_ = false;
   return 0;
 }
 
-WebRtc_Word16 ACMGenericCodec::Encode(WebRtc_UWord8* bitStream,
-                                      WebRtc_Word16* bitStreamLenByte,
-                                      WebRtc_UWord32* timeStamp,
-                                      WebRtcACMEncodingType* encodingType) {
-  WriteLockScoped lockCodec(_codecWrapperLock);
-  ReadLockScoped lockNetEq(*_netEqDecodeLock);
-  return EncodeSafe(bitStream, bitStreamLenByte, timeStamp, encodingType);
+bool ACMGenericCodec::HasFrameToEncode() const {
+  ReadLockScoped lockCodec(codec_wrapper_lock_);
+  if (in_audio_ix_write_ < frame_len_smpl_ * num_channels_)
+    return false;
+  return true;
 }
 
-WebRtc_Word16 ACMGenericCodec::EncodeSafe(WebRtc_UWord8* bitStream,
-                                          WebRtc_Word16* bitStreamLenByte,
-                                          WebRtc_UWord32* timeStamp,
-                                          WebRtcACMEncodingType* encodingType) {
-  // Do we have enough data to encode?
-  // we wait until we have a full frame to encode.
-  if (_inAudioIxWrite < _frameLenSmpl * _noChannels) {
+int16_t ACMGenericCodec::Encode(uint8_t* bitstream,
+                                int16_t* bitstream_len_byte,
+                                uint32_t* timestamp,
+                                WebRtcACMEncodingType* encoding_type) {
+  if (!HasFrameToEncode()) {
     // There is not enough audio
-    *timeStamp = 0;
-    *bitStreamLenByte = 0;
+    *timestamp = 0;
+    *bitstream_len_byte = 0;
     // Doesn't really matter what this parameter set to
-    *encodingType = kNoEncoding;
+    *encoding_type = kNoEncoding;
     return 0;
   }
+  WriteLockScoped lockCodec(codec_wrapper_lock_);
+  ReadLockScoped lockNetEq(*neteq_decode_lock_);
 
-  // Not all codecs accept the whole frame to be pushed into
-  // encoder at once.
-  const WebRtc_Word16 myBasicCodingBlockSmpl =
-      ACMCodecDB::BasicCodingBlock(_codecID);
-  if ((myBasicCodingBlockSmpl < 0) || (!_encoderInitialized) ||
-      (!_encoderExist)) {
-    // This should not happen
-    *timeStamp = 0;
-    *bitStreamLenByte = 0;
-    *encodingType = kNoEncoding;
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+  // Not all codecs accept the whole frame to be pushed into encoder at once.
+  // Some codecs needs to be feed with a specific number of samples different
+  // from the frame size. If this is the case, |myBasicCodingBlockSmpl| will
+  // report a number different from 0, and we will loop over calls to encoder
+  // further down, until we have encode a complete frame.
+  const int16_t my_basic_coding_block_smpl =
+      ACMCodecDB::BasicCodingBlock(codec_id_);
+  if (my_basic_coding_block_smpl < 0 || !encoder_initialized_ ||
+      !encoder_exist_) {
+    // This should not happen, but in case it does, report no encoding done.
+    *timestamp = 0;
+    *bitstream_len_byte = 0;
+    *encoding_type = kNoEncoding;
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                  "EncodeSafe: error, basic coding sample block is negative");
     return -1;
   }
+  // This makes the internal encoder read from the beginning of the buffer.
+  in_audio_ix_read_ = 0;
+  *timestamp = in_timestamp_[0];
 
-  // This makes the internal encoder read from the begining of the buffer
-  _inAudioIxRead = 0;
-  *timeStamp = _inTimestamp[0];
-
-  // Process the audio through VAD the function doesn't set _vadLabels.
-  // If VAD is disabled all labels are set to ONE (active)
-  WebRtc_Word16 status = 0;
-  WebRtc_Word16 dtxProcessedSamples = 0;
-
-  status = ProcessFrameVADDTX(bitStream, bitStreamLenByte,
-                              &dtxProcessedSamples);
-
+  // Process the audio through VAD. The function will set |_vad_labels|.
+  // If VAD is disabled all entries in |_vad_labels| are set to ONE (active).
+  int16_t status = 0;
+  int16_t dtx_processed_samples = 0;
+  status = ProcessFrameVADDTX(bitstream, bitstream_len_byte,
+                              &dtx_processed_samples);
   if (status < 0) {
-    *timeStamp = 0;
-    *bitStreamLenByte = 0;
-    *encodingType = kNoEncoding;
+    *timestamp = 0;
+    *bitstream_len_byte = 0;
+    *encoding_type = kNoEncoding;
   } else {
-    if (dtxProcessedSamples > 0) {
-      // Dtx have processed some samples may or may not a bit-stream
-      // is generated we should not do any encoding (normally there
-      // will be not enough data)
+    if (dtx_processed_samples > 0) {
+      // Dtx have processed some samples, and even if a bit-stream is generated
+      // we should not do any encoding (normally there won't be enough data).
 
-      // Setting the following makes that the move of audio data
-      // and timestamps happen correctly
-      _inAudioIxRead = dtxProcessedSamples;
+      // Setting the following makes sure that the move of audio data and
+      // timestamps done correctly.
+      in_audio_ix_read_ = dtx_processed_samples;
       // This will let the owner of ACMGenericCodec to know that the
-      // generated bit-stream is DTX to use correct payload type
-      WebRtc_UWord16 sampFreqHz;
-      EncoderSampFreq(sampFreqHz);
-      if (sampFreqHz == 8000) {
-        *encodingType = kPassiveDTXNB;
-      } else if (sampFreqHz == 16000) {
-        *encodingType = kPassiveDTXWB;
-      } else if (sampFreqHz == 32000) {
-        *encodingType = kPassiveDTXSWB;
-      } else if (sampFreqHz == 48000) {
-        *encodingType = kPassiveDTXFB;
+      // generated bit-stream is DTX to use correct payload type.
+      uint16_t samp_freq_hz;
+      EncoderSampFreq(samp_freq_hz);
+      if (samp_freq_hz == 8000) {
+        *encoding_type = kPassiveDTXNB;
+      } else if (samp_freq_hz == 16000) {
+        *encoding_type = kPassiveDTXWB;
+      } else if (samp_freq_hz == 32000) {
+        *encoding_type = kPassiveDTXSWB;
+      } else if (samp_freq_hz == 48000) {
+        *encoding_type = kPassiveDTXFB;
       } else {
         status = -1;
-        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                      "EncodeSafe: Wrong sampling frequency for DTX.");
       }
 
-      // Transport empty frame if we have an empty bitstream
-      if ((*bitStreamLenByte == 0) &&
-          (_sentCNPrevious || ((_inAudioIxWrite - _inAudioIxRead) <= 0))) {
-        // Makes sure we transmit an empty frame
-        *bitStreamLenByte = 1;
-        *encodingType = kNoEncoding;
+      // Transport empty frame if we have an empty bitstream.
+      if ((*bitstream_len_byte == 0) &&
+          (sent_cn_previous_ ||
+          ((in_audio_ix_write_ - in_audio_ix_read_) <= 0))) {
+        // Makes sure we transmit an empty frame.
+        *bitstream_len_byte = 1;
+        *encoding_type = kNoEncoding;
       }
-      _sentCNPrevious = true;
+      sent_cn_previous_ = true;
     } else {
-      _sentCNPrevious = false;
-      // This will let the caller of the method to know if the frame is
-      // Active or non-Active The caller of the method knows that the
-      // stream is encoded by codec and can use the info for callbacks,
-      // if any registered.
-      if (myBasicCodingBlockSmpl == 0) {
-        // This codec can handle all allowed frame sizes as basic
-        // coding block
-        status = InternalEncode(bitStream, bitStreamLenByte);
+      // We should encode the audio frame. Either VAD and/or DTX is off, or the
+      // audio was considered "active".
 
+      sent_cn_previous_ = false;
+      if (my_basic_coding_block_smpl == 0) {
+        // This codec can handle all allowed frame sizes as basic coding block.
+        status = InternalEncode(bitstream, bitstream_len_byte);
         if (status < 0) {
           // TODO(tlegrand): Maybe reseting the encoder to be fresh for the next
           // frame.
           WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding,
-                       _uniqueID, "EncodeSafe: error in internalEncode");
-          *bitStreamLenByte = 0;
-          *encodingType = kNoEncoding;
+                       unique_id_, "EncodeSafe: error in internal_encode");
+          *bitstream_len_byte = 0;
+          *encoding_type = kNoEncoding;
         }
       } else {
-        // A basic-coding-block for this codec is defined so we loop
-        // over the audio with the steps of the basic-coding-block.
-        // It is not necessary that in each itteration
-        WebRtc_Word16 tmpBitStreamLenByte;
+        // A basic-coding-block for this codec is defined so we loop over the
+        // audio with the steps of the basic-coding-block.
+        int16_t tmp_bitstream_len_byte;
 
-        // Reset the variables which will be increamented in the loop
-        *bitStreamLenByte = 0;
+        // Reset the variables which will be incremented in the loop.
+        *bitstream_len_byte = 0;
         bool done = false;
         while (!done) {
-          status = InternalEncode(&bitStream[*bitStreamLenByte],
-                                  &tmpBitStreamLenByte);
-          *bitStreamLenByte += tmpBitStreamLenByte;
+          status = InternalEncode(&bitstream[*bitstream_len_byte],
+                                  &tmp_bitstream_len_byte);
+          *bitstream_len_byte += tmp_bitstream_len_byte;
 
-          // Guard Against errors and too large payloads
-          if ((status < 0) || (*bitStreamLenByte > MAX_PAYLOAD_SIZE_BYTE)) {
-            // Error has happened if we are in the middle of a full
-            // frame we have to exit. Before exiting, whatever bits
-            // are in the buffer are probably corruptred. Anyways
-            // we ignore them.
-            *bitStreamLenByte = 0;
-            *encodingType = kNoEncoding;
-            // We might have come here because of the second
-            // condition.
+          // Guard Against errors and too large payloads.
+          if ((status < 0) || (*bitstream_len_byte > MAX_PAYLOAD_SIZE_BYTE)) {
+            // Error has happened, and even if we are in the middle of a full
+            // frame we have to exit. Before exiting, whatever bits are in the
+            // buffer are probably corrupted, so we ignore them.
+            *bitstream_len_byte = 0;
+            *encoding_type = kNoEncoding;
+            // We might have come here because of the second condition.
             status = -1;
             WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding,
-                         _uniqueID, "EncodeSafe: error in InternalEncode");
+                         unique_id_, "EncodeSafe: error in InternalEncode");
             // break from the loop
             break;
           }
@@ -330,422 +327,415 @@ WebRtc_Word16 ACMGenericCodec::EncodeSafe(WebRtc_UWord8* bitStream,
           // TODO(andrew): This should be multiplied by the number of
           //               channels, right?
           // http://code.google.com/p/webrtc/issues/detail?id=714
-          done = _inAudioIxRead >= _frameLenSmpl;
+          done = in_audio_ix_read_ >= frame_len_smpl_;
         }
       }
       if (status >= 0) {
-        *encodingType = (_vadLabel[0] == 1) ? kActiveNormalEncoded :
+        *encoding_type = (vad_label_[0] == 1) ? kActiveNormalEncoded :
             kPassiveNormalEncoded;
-        // Transport empty frame if we have an empty bitsteram
-        if ((*bitStreamLenByte == 0) &&
-            ((_inAudioIxWrite - _inAudioIxRead) <= 0)) {
-          // Makes sure we transmit an empty frame
-          *bitStreamLenByte = 1;
-          *encodingType = kNoEncoding;
+        // Transport empty frame if we have an empty bitstream.
+        if ((*bitstream_len_byte == 0) &&
+            ((in_audio_ix_write_ - in_audio_ix_read_) <= 0)) {
+          // Makes sure we transmit an empty frame.
+          *bitstream_len_byte = 1;
+          *encoding_type = kNoEncoding;
         }
       }
     }
   }
 
-  // Move the timestampe buffer according to the number of 10 ms blocks
+  // Move the timestamp buffer according to the number of 10 ms blocks
   // which are read.
-  WebRtc_UWord16 sampFreqHz;
-  EncoderSampFreq(sampFreqHz);
-
-  WebRtc_Word16 num10MsecBlocks = (WebRtc_Word16)(
-      (_inAudioIxRead / _noChannels * 100) / sampFreqHz);
-  if (_inTimestampIxWrite > num10MsecBlocks) {
-    memmove(_inTimestamp, _inTimestamp + num10MsecBlocks,
-            (_inTimestampIxWrite - num10MsecBlocks) * sizeof(WebRtc_Word32));
+  uint16_t samp_freq_hz;
+  EncoderSampFreq(samp_freq_hz);
+  int16_t num_10ms_blocks = static_cast<int16_t>(
+      (in_audio_ix_read_ / num_channels_ * 100) / samp_freq_hz);
+  if (in_timestamp_ix_write_ > num_10ms_blocks) {
+    memmove(in_timestamp_, in_timestamp_ + num_10ms_blocks,
+            (in_timestamp_ix_write_ - num_10ms_blocks) * sizeof(int32_t));
   }
-  _inTimestampIxWrite -= num10MsecBlocks;
+  in_timestamp_ix_write_ -= num_10ms_blocks;
 
-  // We have to move the audio that is not encoded to the beginning
-  // of the buffer and accordingly adjust the read and write indices.
-  if (_inAudioIxRead < _inAudioIxWrite) {
-    memmove(_inAudio, &_inAudio[_inAudioIxRead],
-            (_inAudioIxWrite - _inAudioIxRead) * sizeof(WebRtc_Word16));
+  // Remove encoded audio and move next audio to be encoded to the beginning
+  // of the buffer. Accordingly, adjust the read and write indices.
+  if (in_audio_ix_read_ < in_audio_ix_write_) {
+    memmove(in_audio_, &in_audio_[in_audio_ix_read_],
+            (in_audio_ix_write_ - in_audio_ix_read_) * sizeof(int16_t));
   }
-
-  _inAudioIxWrite -= _inAudioIxRead;
-
-  _inAudioIxRead = 0;
-  _lastEncodedTimestamp = *timeStamp;
-  return (status < 0) ? (-1) : (*bitStreamLenByte);
+  in_audio_ix_write_ -= in_audio_ix_read_;
+  in_audio_ix_read_ = 0;
+  last_encoded_timestamp_ = *timestamp;
+  return (status < 0) ? (-1) : (*bitstream_len_byte);
 }
 
-WebRtc_Word16 ACMGenericCodec::Decode(WebRtc_UWord8* bitStream,
-                                      WebRtc_Word16 bitStreamLenByte,
-                                      WebRtc_Word16* audio,
-                                      WebRtc_Word16* audioSamples,
-                                      WebRtc_Word8* speechType) {
-  WriteLockScoped wl(_codecWrapperLock);
-  return DecodeSafe(bitStream, bitStreamLenByte, audio, audioSamples,
-                    speechType);
+int16_t ACMGenericCodec::Decode(uint8_t* bitstream,
+                                int16_t bitstream_len_byte,
+                                int16_t* audio,
+                                int16_t* audio_samples,
+                                int8_t* speech_type) {
+  WriteLockScoped wl(codec_wrapper_lock_);
+  return DecodeSafe(bitstream, bitstream_len_byte, audio, audio_samples,
+                    speech_type);
 }
 
 bool ACMGenericCodec::EncoderInitialized() {
-  ReadLockScoped rl(_codecWrapperLock);
-  return _encoderInitialized;
+  ReadLockScoped rl(codec_wrapper_lock_);
+  return encoder_initialized_;
 }
 
 bool ACMGenericCodec::DecoderInitialized() {
-  ReadLockScoped rl(_codecWrapperLock);
-  return _decoderInitialized;
+  ReadLockScoped rl(codec_wrapper_lock_);
+  return decoder_initialized_;
 }
 
-WebRtc_Word32 ACMGenericCodec::RegisterInNetEq(ACMNetEQ* netEq,
-                                               const CodecInst& codecInst) {
-  WebRtcNetEQ_CodecDef codecDef;
-  WriteLockScoped wl(_codecWrapperLock);
+int32_t ACMGenericCodec::RegisterInNetEq(ACMNetEQ* neteq,
+                                         const CodecInst& codec_inst) {
+  WebRtcNetEQ_CodecDef codec_def;
+  WriteLockScoped wl(codec_wrapper_lock_);
 
-  if (CodecDef(codecDef, codecInst) < 0) {
-    // Failed to register
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+  if (CodecDef(codec_def, codec_inst) < 0) {
+    // Failed to register the decoder.
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                  "RegisterInNetEq: error, failed to register");
-    _registeredInNetEq = false;
+    registered_in_neteq_ = false;
     return -1;
   } else {
-    if (netEq->AddCodec(&codecDef, _isMaster) < 0) {
-      WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+    if (neteq->AddCodec(&codec_def, is_master_) < 0) {
+      WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                    "RegisterInNetEq: error, failed to add codec");
-      _registeredInNetEq = false;
+      registered_in_neteq_ = false;
       return -1;
     }
-    // Registered
-    _registeredInNetEq = true;
+    // Succeeded registering the decoder.
+    registered_in_neteq_ = true;
     return 0;
   }
 }
 
-WebRtc_Word16 ACMGenericCodec::EncoderParams(WebRtcACMCodecParams* encParams) {
-  ReadLockScoped rl(_codecWrapperLock);
-  return EncoderParamsSafe(encParams);
+int16_t ACMGenericCodec::EncoderParams(WebRtcACMCodecParams* enc_params) {
+  ReadLockScoped rl(codec_wrapper_lock_);
+  return EncoderParamsSafe(enc_params);
 }
 
-WebRtc_Word16 ACMGenericCodec::EncoderParamsSafe(
-    WebRtcACMCodecParams* encParams) {
-  // Codec parameters are valid only if the encoder is initialized
-  if (_encoderInitialized) {
-    WebRtc_Word32 currentRate;
-    memcpy(encParams, &_encoderParams, sizeof(WebRtcACMCodecParams));
-    currentRate = encParams->codecInstant.rate;
-    CurrentRate(currentRate);
-    encParams->codecInstant.rate = currentRate;
+int16_t ACMGenericCodec::EncoderParamsSafe(WebRtcACMCodecParams* enc_params) {
+  // Codec parameters are valid only if the encoder is initialized.
+  if (encoder_initialized_) {
+    int32_t current_rate;
+    memcpy(enc_params, &encoder_params_, sizeof(WebRtcACMCodecParams));
+    current_rate = enc_params->codec_inst.rate;
+    CurrentRate(current_rate);
+    enc_params->codec_inst.rate = current_rate;
     return 0;
   } else {
-    encParams->codecInstant.plname[0] = '\0';
-    encParams->codecInstant.pltype = -1;
-    encParams->codecInstant.pacsize = 0;
-    encParams->codecInstant.rate = 0;
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+    enc_params->codec_inst.plname[0] = '\0';
+    enc_params->codec_inst.pltype = -1;
+    enc_params->codec_inst.pacsize = 0;
+    enc_params->codec_inst.rate = 0;
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                  "EncoderParamsSafe: error, encoder not initialized");
     return -1;
   }
 }
 
-bool ACMGenericCodec::DecoderParams(WebRtcACMCodecParams* decParams,
-                                    const WebRtc_UWord8 payloadType) {
-  ReadLockScoped rl(_codecWrapperLock);
-  return DecoderParamsSafe(decParams, payloadType);
+bool ACMGenericCodec::DecoderParams(WebRtcACMCodecParams* dec_params,
+                                    const uint8_t payload_type) {
+  ReadLockScoped rl(codec_wrapper_lock_);
+  return DecoderParamsSafe(dec_params, payload_type);
 }
 
-bool ACMGenericCodec::DecoderParamsSafe(WebRtcACMCodecParams* decParams,
-                                        const WebRtc_UWord8 payloadType) {
-  // Decoder parameters are valid only if decoder is initialized
-  if (_decoderInitialized) {
-    if (payloadType == _decoderParams.codecInstant.pltype) {
-      memcpy(decParams, &_decoderParams, sizeof(WebRtcACMCodecParams));
+bool ACMGenericCodec::DecoderParamsSafe(WebRtcACMCodecParams* dec_params,
+                                        const uint8_t payload_type) {
+  // Decoder parameters are valid only if decoder is initialized.
+  if (decoder_initialized_) {
+    if (payload_type == decoder_params_.codec_inst.pltype) {
+      memcpy(dec_params, &decoder_params_, sizeof(WebRtcACMCodecParams));
       return true;
     }
   }
 
-  decParams->codecInstant.plname[0] = '\0';
-  decParams->codecInstant.pltype = -1;
-  decParams->codecInstant.pacsize = 0;
-  decParams->codecInstant.rate = 0;
+  dec_params->codec_inst.plname[0] = '\0';
+  dec_params->codec_inst.pltype = -1;
+  dec_params->codec_inst.pacsize = 0;
+  dec_params->codec_inst.rate = 0;
   return false;
 }
 
-WebRtc_Word16 ACMGenericCodec::ResetEncoder() {
-  WriteLockScoped lockCodec(_codecWrapperLock);
-  ReadLockScoped lockNetEq(*_netEqDecodeLock);
+int16_t ACMGenericCodec::ResetEncoder() {
+  WriteLockScoped lockCodec(codec_wrapper_lock_);
+  ReadLockScoped lockNetEq(*neteq_decode_lock_);
   return ResetEncoderSafe();
 }
 
-WebRtc_Word16 ACMGenericCodec::ResetEncoderSafe() {
-  if (!_encoderExist || !_encoderInitialized) {
-    // We don't reset if doesn't exists or not initialized yet
+int16_t ACMGenericCodec::ResetEncoderSafe() {
+  if (!encoder_exist_ || !encoder_initialized_) {
+    // We don't reset if encoder doesn't exists or isn't initialized yet.
     return 0;
   }
 
-  _inAudioIxWrite = 0;
-  _inAudioIxRead = 0;
-  _inTimestampIxWrite = 0;
-  _noMissedSamples = 0;
-  _isAudioBuffFresh = true;
-  memset(_inAudio, 0, AUDIO_BUFFER_SIZE_W16 * sizeof(WebRtc_Word16));
-  memset(_inTimestamp, 0, TIMESTAMP_BUFFER_SIZE_W32 * sizeof(WebRtc_Word32));
+  in_audio_ix_write_ = 0;
+  in_audio_ix_read_ = 0;
+  in_timestamp_ix_write_ = 0;
+  num_missed_samples_ = 0;
+  is_audio_buff_fresh_ = true;
+  memset(in_audio_, 0, AUDIO_BUFFER_SIZE_W16 * sizeof(int16_t));
+  memset(in_timestamp_, 0, TIMESTAMP_BUFFER_SIZE_W32 * sizeof(int32_t));
 
-  // Store DTX/VAD params
-  bool enableVAD = _vadEnabled;
-  bool enableDTX = _dtxEnabled;
-  ACMVADMode mode = _vadMode;
+  // Store DTX/VAD parameters.
+  bool enable_vad = vad_enabled_;
+  bool enable_dtx = dtx_enabled_;
+  ACMVADMode mode = vad_mode_;
 
-  // Reset the encoder
+  // Reset the encoder.
   if (InternalResetEncoder() < 0) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                  "ResetEncoderSafe: error in reset encoder");
     return -1;
   }
 
-  // Disable DTX & VAD this deletes the states
-  // we like to have fresh start
+  // Disable DTX & VAD to delete the states and have a fresh start.
   DisableDTX();
   DisableVAD();
 
-  // Set DTX/VAD
-  return SetVADSafe(enableDTX, enableVAD, mode);
+  // Set DTX/VAD.
+  return SetVADSafe(enable_dtx, enable_vad, mode);
 }
 
-WebRtc_Word16 ACMGenericCodec::InternalResetEncoder() {
-  // For most of the codecs it is sufficient to
-  // call their internal initialization.
-  // There are some exceptions.
-  // ----
-  // For iSAC we don't want to lose BWE history,
-  // so for iSAC we have to over-write this function.
-  // ----
-  return InternalInitEncoder(&_encoderParams);
+int16_t ACMGenericCodec::InternalResetEncoder() {
+  // Call the codecs internal encoder initialization/reset function.
+  return InternalInitEncoder(&encoder_params_);
 }
 
-WebRtc_Word16 ACMGenericCodec::InitEncoder(WebRtcACMCodecParams* codecParams,
-                                           bool forceInitialization) {
-  WriteLockScoped lockCodec(_codecWrapperLock);
-  ReadLockScoped lockNetEq(*_netEqDecodeLock);
-  return InitEncoderSafe(codecParams, forceInitialization);
+int16_t ACMGenericCodec::InitEncoder(WebRtcACMCodecParams* codec_params,
+                                     bool force_initialization) {
+  WriteLockScoped lockCodec(codec_wrapper_lock_);
+  ReadLockScoped lockNetEq(*neteq_decode_lock_);
+  return InitEncoderSafe(codec_params, force_initialization);
 }
 
-WebRtc_Word16 ACMGenericCodec::InitEncoderSafe(
-    WebRtcACMCodecParams* codecParams, bool forceInitialization) {
-  // Check if we got a valid set of parameters
+int16_t ACMGenericCodec::InitEncoderSafe(WebRtcACMCodecParams* codec_params,
+                                         bool force_initialization) {
+  // Check if we got a valid set of parameters.
   int mirrorID;
-  int codecNumber = ACMCodecDB::CodecNumber(&(codecParams->codecInstant),
-                                            &mirrorID);
-
-  if (codecNumber < 0) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+  int codec_number = ACMCodecDB::CodecNumber(&(codec_params->codec_inst),
+                                             &mirrorID);
+  if (codec_number < 0) {
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                  "InitEncoderSafe: error, codec number negative");
     return -1;
   }
-  // Check if the parameters are for this codec
-  if ((_codecID >= 0) && (_codecID != codecNumber) && (_codecID != mirrorID)) {
-    // The current codec is not the same as the one given by codecParams
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
-        "InitEncoderSafe: current codec is not the same as the one given by "
-        "codecParams");
+  // Check if the parameters are for this codec.
+  if ((codec_id_ >= 0) && (codec_id_ != codec_number) &&
+      (codec_id_ != mirrorID)) {
+    // The current codec is not the same as the one given by codec_params.
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
+                 "InitEncoderSafe: current codec is not the same as the one "
+                 "given by codec_params");
     return -1;
   }
 
-  if (!CanChangeEncodingParam(codecParams->codecInstant)) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+  if (!CanChangeEncodingParam(codec_params->codec_inst)) {
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                  "InitEncoderSafe: cannot change encoding parameters");
     return -1;
   }
 
-  if (_encoderInitialized && !forceInitialization) {
-    // The encoder is already initialized
+  if (encoder_initialized_ && !force_initialization) {
+    // The encoder is already initialized, and we don't want to force
+    // initialization.
     return 0;
   }
-  WebRtc_Word16 status;
-  if (!_encoderExist) {
-    _encoderInitialized = false;
+  int16_t status;
+  if (!encoder_exist_) {
+    // New encoder, start with creating.
+    encoder_initialized_ = false;
     status = CreateEncoder();
     if (status < 0) {
-      WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+      WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                    "InitEncoderSafe: cannot create encoder");
       return -1;
     } else {
-      _encoderExist = true;
+      encoder_exist_ = true;
     }
   }
-  _frameLenSmpl = (codecParams->codecInstant).pacsize;
-  _noChannels = codecParams->codecInstant.channels;
-  status = InternalInitEncoder(codecParams);
+  frame_len_smpl_ = (codec_params->codec_inst).pacsize;
+  num_channels_ = codec_params->codec_inst.channels;
+  status = InternalInitEncoder(codec_params);
   if (status < 0) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                  "InitEncoderSafe: error in init encoder");
-    _encoderInitialized = false;
+    encoder_initialized_ = false;
     return -1;
   } else {
-    memcpy(&_encoderParams, codecParams, sizeof(WebRtcACMCodecParams));
-    _encoderInitialized = true;
-    if (_inAudio == NULL) {
-      _inAudio = new WebRtc_Word16[AUDIO_BUFFER_SIZE_W16];
-      if (_inAudio == NULL) {
+    // Store encoder parameters.
+    memcpy(&encoder_params_, codec_params, sizeof(WebRtcACMCodecParams));
+    encoder_initialized_ = true;
+    if (in_audio_ == NULL) {
+      in_audio_ = new int16_t[AUDIO_BUFFER_SIZE_W16];
+      if (in_audio_ == NULL) {
         return -1;
       }
-      memset(_inAudio, 0, AUDIO_BUFFER_SIZE_W16 * sizeof(WebRtc_Word16));
+      memset(in_audio_, 0, AUDIO_BUFFER_SIZE_W16 * sizeof(int16_t));
     }
-    if (_inTimestamp == NULL) {
-      _inTimestamp = new WebRtc_UWord32[TIMESTAMP_BUFFER_SIZE_W32];
-      if (_inTimestamp == NULL) {
+    if (in_timestamp_ == NULL) {
+      in_timestamp_ = new uint32_t[TIMESTAMP_BUFFER_SIZE_W32];
+      if (in_timestamp_ == NULL) {
         return -1;
       }
-      memset(_inTimestamp, 0,
-             sizeof(WebRtc_UWord32) * TIMESTAMP_BUFFER_SIZE_W32);
+      memset(in_timestamp_, 0, sizeof(uint32_t) * TIMESTAMP_BUFFER_SIZE_W32);
     }
-    _isAudioBuffFresh = true;
+    is_audio_buff_fresh_ = true;
   }
-  status = SetVADSafe(codecParams->enableDTX, codecParams->enableVAD,
-                      codecParams->vadMode);
+  status = SetVADSafe(codec_params->enable_dtx, codec_params->enable_vad,
+                      codec_params->vad_mode);
 
   return status;
 }
 
-bool ACMGenericCodec::CanChangeEncodingParam(CodecInst& /*codecInst*/) {
+// TODO(tlegrand): Remove the function CanChangeEncodingParam. Returns true
+// for all codecs.
+bool ACMGenericCodec::CanChangeEncodingParam(CodecInst& /*codec_inst*/) {
   return true;
 }
 
-WebRtc_Word16 ACMGenericCodec::InitDecoder(WebRtcACMCodecParams* codecParams,
-                                           bool forceInitialization) {
-  WriteLockScoped lockCodc(_codecWrapperLock);
-  WriteLockScoped lockNetEq(*_netEqDecodeLock);
-  return InitDecoderSafe(codecParams, forceInitialization);
+int16_t ACMGenericCodec::InitDecoder(WebRtcACMCodecParams* codec_params,
+                                     bool force_initialization) {
+  WriteLockScoped lockCodc(codec_wrapper_lock_);
+  WriteLockScoped lockNetEq(*neteq_decode_lock_);
+  return InitDecoderSafe(codec_params, force_initialization);
 }
 
-WebRtc_Word16 ACMGenericCodec::InitDecoderSafe(
-    WebRtcACMCodecParams* codecParams, bool forceInitialization) {
-  int mirrorID;
-  // Check if we got a valid set of parameters
-  int codecNumber = ACMCodecDB::ReceiverCodecNumber(&codecParams->codecInstant,
-                                                    &mirrorID);
-
-  if (codecNumber < 0) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+int16_t ACMGenericCodec::InitDecoderSafe(WebRtcACMCodecParams* codec_params,
+                                         bool force_initialization) {
+  int mirror_id;
+  // Check if we got a valid set of parameters.
+  int codec_number = ACMCodecDB::ReceiverCodecNumber(&codec_params->codec_inst,
+                                                     &mirror_id);
+  if (codec_number < 0) {
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                  "InitDecoderSafe: error, invalid codec number");
     return -1;
   }
-  // Check if the parameters are for this codec
-  if ((_codecID >= 0) && (_codecID != codecNumber) && (_codecID != mirrorID)) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
-        "InitDecoderSafe: current codec is not the same as the one given "
-        "by codecParams");
-    // The current codec is not the same as the one given by codecParams
+  // Check if the parameters are for this codec.
+  if ((codec_id_ >= 0) && (codec_id_ != codec_number) &&
+      (codec_id_ != mirror_id)) {
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
+                 "InitDecoderSafe: current codec is not the same as the one "
+                 "given by codec_params");
+    // The current codec is not the same as the one given by codec_params.
     return -1;
   }
 
-  if (_decoderInitialized && !forceInitialization) {
-    // The encoder is already initialized
+  if (decoder_initialized_ && !force_initialization) {
+    // The decoder is already initialized, and we don't want to force
+    // initialization.
     return 0;
   }
 
-  WebRtc_Word16 status;
-  if (!_decoderExist) {
-    _decoderInitialized = false;
+  int16_t status;
+  if (!decoder_exist_) {
+    // New decoder, start with creating.
+    decoder_initialized_ = false;
     status = CreateDecoder();
     if (status < 0) {
-      WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+      WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                    "InitDecoderSafe: cannot create decoder");
       return -1;
     } else {
-      _decoderExist = true;
+      decoder_exist_ = true;
     }
   }
 
-  status = InternalInitDecoder(codecParams);
+  status = InternalInitDecoder(codec_params);
   if (status < 0) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                  "InitDecoderSafe: cannot init decoder");
-    _decoderInitialized = false;
+    decoder_initialized_ = false;
     return -1;
   } else {
-    // Store the parameters
-    SaveDecoderParamSafe(codecParams);
-    _decoderInitialized = true;
+    // Store decoder parameters.
+    SaveDecoderParamSafe(codec_params);
+    decoder_initialized_ = true;
   }
   return 0;
 }
 
-WebRtc_Word16 ACMGenericCodec::ResetDecoder(WebRtc_Word16 payloadType) {
-  WriteLockScoped lockCodec(_codecWrapperLock);
-  WriteLockScoped lockNetEq(*_netEqDecodeLock);
-  return ResetDecoderSafe(payloadType);
+int16_t ACMGenericCodec::ResetDecoder(int16_t payload_type) {
+  WriteLockScoped lockCodec(codec_wrapper_lock_);
+  WriteLockScoped lockNetEq(*neteq_decode_lock_);
+  return ResetDecoderSafe(payload_type);
 }
 
-WebRtc_Word16 ACMGenericCodec::ResetDecoderSafe(WebRtc_Word16 payloadType) {
-  WebRtcACMCodecParams decoderParams;
-  if (!_decoderExist || !_decoderInitialized) {
+int16_t ACMGenericCodec::ResetDecoderSafe(int16_t payload_type) {
+  WebRtcACMCodecParams decoder_params;
+  if (!decoder_exist_ || !decoder_initialized_) {
     return 0;
   }
-  // Initialization of the decoder should work for all
-  // the codec. If there is a codec that has to keep
-  // some states then we need to define a virtual and
-  // overwrite in that codec
-  DecoderParamsSafe(&decoderParams, (WebRtc_UWord8) payloadType);
-  return InternalInitDecoder(&decoderParams);
+  // Initialization of the decoder should work for all the codec. For codecs
+  // that needs to keep some states an overloading implementation of
+  // |DecoderParamsSafe| exists.
+  DecoderParamsSafe(&decoder_params, static_cast<uint8_t>(payload_type));
+  return InternalInitDecoder(&decoder_params);
 }
 
 void ACMGenericCodec::ResetNoMissedSamples() {
-  WriteLockScoped cs(_codecWrapperLock);
-  _noMissedSamples = 0;
+  WriteLockScoped cs(codec_wrapper_lock_);
+  num_missed_samples_ = 0;
 }
 
-void ACMGenericCodec::IncreaseNoMissedSamples(const WebRtc_Word16 noSamples) {
-  _noMissedSamples += noSamples;
+void ACMGenericCodec::IncreaseNoMissedSamples(const int16_t num_samples) {
+  num_missed_samples_ += num_samples;
 }
 
-// Get the number of missed samples, this can be public
-WebRtc_UWord32 ACMGenericCodec::NoMissedSamples() const {
-  ReadLockScoped cs(_codecWrapperLock);
-  return _noMissedSamples;
+// Get the number of missed samples, this can be public.
+uint32_t ACMGenericCodec::NoMissedSamples() const {
+  ReadLockScoped cs(codec_wrapper_lock_);
+  return num_missed_samples_;
 }
 
 void ACMGenericCodec::DestructEncoder() {
-  WriteLockScoped wl(_codecWrapperLock);
+  WriteLockScoped wl(codec_wrapper_lock_);
 
-  // Disable VAD and delete the instance
-  if (_ptrVADInst != NULL) {
-    WebRtcVad_Free(_ptrVADInst);
-    _ptrVADInst = NULL;
+  // Disable VAD and delete the instance.
+  if (ptr_vad_inst_ != NULL) {
+    WebRtcVad_Free(ptr_vad_inst_);
+    ptr_vad_inst_ = NULL;
   }
-  _vadEnabled = false;
-  _vadMode = VADNormal;
+  vad_enabled_ = false;
+  vad_mode_ = VADNormal;
 
-  //Disable DTX and delete the instance
-  _dtxEnabled = false;
-  if (_ptrDTXInst != NULL) {
-    WebRtcCng_FreeEnc(_ptrDTXInst);
-    _ptrDTXInst = NULL;
+  // Disable DTX and delete the instance.
+  dtx_enabled_ = false;
+  if (ptr_dtx_inst_ != NULL) {
+    WebRtcCng_FreeEnc(ptr_dtx_inst_);
+    ptr_dtx_inst_ = NULL;
   }
-  _numLPCParams = kNewCNGNumPLCParams;
+  num_lpc_params_ = kNewCNGNumPLCParams;
 
   DestructEncoderSafe();
 }
 
 void ACMGenericCodec::DestructDecoder() {
-  WriteLockScoped wl(_codecWrapperLock);
-  _decoderParams.codecInstant.pltype = -1;
+  WriteLockScoped wl(codec_wrapper_lock_);
+  decoder_params_.codec_inst.pltype = -1;
   DestructDecoderSafe();
 }
 
-WebRtc_Word16 ACMGenericCodec::SetBitRate(const WebRtc_Word32 bitRateBPS) {
-  WriteLockScoped wl(_codecWrapperLock);
-  return SetBitRateSafe(bitRateBPS);
+int16_t ACMGenericCodec::SetBitRate(const int32_t bitrate_bps) {
+  WriteLockScoped wl(codec_wrapper_lock_);
+  return SetBitRateSafe(bitrate_bps);
 }
 
-WebRtc_Word16 ACMGenericCodec::SetBitRateSafe(const WebRtc_Word32 bitRateBPS) {
-  // If the codec can change the bit-rate this function
-  // should be overwritten, otherewise the only acceptable
-  // value is the one that is in database.
-  CodecInst codecParams;
-  if (ACMCodecDB::Codec(_codecID, &codecParams) < 0) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+int16_t ACMGenericCodec::SetBitRateSafe(const int32_t bitrate_bps) {
+  // If the codec can change the bit-rate this function is overloaded.
+  // Otherwise the only acceptable value is the one that is in the database.
+  CodecInst codec_params;
+  if (ACMCodecDB::Codec(codec_id_, &codec_params) < 0) {
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                  "SetBitRateSafe: error in ACMCodecDB::Codec");
     return -1;
   }
-  if (codecParams.rate != bitRateBPS) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+  if (codec_params.rate != bitrate_bps) {
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                  "SetBitRateSafe: rate value is not acceptable");
     return -1;
   } else {
@@ -753,365 +743,362 @@ WebRtc_Word16 ACMGenericCodec::SetBitRateSafe(const WebRtc_Word32 bitRateBPS) {
   }
 }
 
-WebRtc_Word32 ACMGenericCodec::GetEstimatedBandwidth() {
-  WriteLockScoped wl(_codecWrapperLock);
+// iSAC specific functions:
+int32_t ACMGenericCodec::GetEstimatedBandwidth() {
+  WriteLockScoped wl(codec_wrapper_lock_);
   return GetEstimatedBandwidthSafe();
 }
 
-WebRtc_Word32 ACMGenericCodec::GetEstimatedBandwidthSafe() {
-  // All codecs but iSAC will return -1
+int32_t ACMGenericCodec::GetEstimatedBandwidthSafe() {
+  // All codecs but iSAC will return -1.
   return -1;
 }
 
-WebRtc_Word32 ACMGenericCodec::SetEstimatedBandwidth(
-    WebRtc_Word32 estimatedBandwidth) {
-  WriteLockScoped wl(_codecWrapperLock);
-  return SetEstimatedBandwidthSafe(estimatedBandwidth);
+int32_t ACMGenericCodec::SetEstimatedBandwidth(int32_t estimated_bandwidth) {
+  WriteLockScoped wl(codec_wrapper_lock_);
+  return SetEstimatedBandwidthSafe(estimated_bandwidth);
 }
 
-WebRtc_Word32 ACMGenericCodec::SetEstimatedBandwidthSafe(
-    WebRtc_Word32 /*estimatedBandwidth*/) {
-  // All codecs but iSAC will return -1
+int32_t ACMGenericCodec::SetEstimatedBandwidthSafe(
+    int32_t /*estimated_bandwidth*/) {
+  // All codecs but iSAC will return -1.
   return -1;
 }
+// End of iSAC specific functions.
 
-WebRtc_Word32 ACMGenericCodec::GetRedPayload(WebRtc_UWord8* redPayload,
-                                             WebRtc_Word16* payloadBytes) {
-  WriteLockScoped wl(_codecWrapperLock);
-  return GetRedPayloadSafe(redPayload, payloadBytes);
+int32_t ACMGenericCodec::GetRedPayload(uint8_t* red_payload,
+                                       int16_t* payload_bytes) {
+  WriteLockScoped wl(codec_wrapper_lock_);
+  return GetRedPayloadSafe(red_payload, payload_bytes);
 }
 
-WebRtc_Word32 ACMGenericCodec::GetRedPayloadSafe(
-    WebRtc_UWord8* /* redPayload   */, WebRtc_Word16* /* payloadBytes */) {
-  return -1;  // Do nothing by default
+int32_t ACMGenericCodec::GetRedPayloadSafe(uint8_t* /* red_payload */,
+                                           int16_t* /* payload_bytes */) {
+  return -1;  // Do nothing by default.
 }
 
-WebRtc_Word16 ACMGenericCodec::CreateEncoder() {
-  WebRtc_Word16 status = 0;
-  if (!_encoderExist) {
+int16_t ACMGenericCodec::CreateEncoder() {
+  int16_t status = 0;
+  if (!encoder_exist_) {
     status = InternalCreateEncoder();
-    // We just created the codec and obviously it is not initialized
-    _encoderInitialized = false;
+    // We just created the codec and obviously it is not initialized.
+    encoder_initialized_ = false;
   }
-
   if (status < 0) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                  "CreateEncoder: error in internal create encoder");
-    _encoderExist = false;
+    encoder_exist_ = false;
   } else {
-    _encoderExist = true;
+    encoder_exist_ = true;
   }
   return status;
 }
 
-WebRtc_Word16 ACMGenericCodec::CreateDecoder() {
-  WebRtc_Word16 status = 0;
-  if (!_decoderExist) {
+int16_t ACMGenericCodec::CreateDecoder() {
+  int16_t status = 0;
+  if (!decoder_exist_) {
     status = InternalCreateDecoder();
-    // Decoder just created and obviously it is not initialized
-    _decoderInitialized = false;
+    // Decoder just created and obviously it is not initialized.
+    decoder_initialized_ = false;
   }
-
   if (status < 0) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                  "CreateDecoder: error in internal create decoder");
-    _decoderExist = false;
+    decoder_exist_ = false;
   } else {
-    _decoderExist = true;
+    decoder_exist_ = true;
   }
   return status;
 }
 
-void ACMGenericCodec::DestructEncoderInst(void* ptrInst) {
-  if (ptrInst != NULL) {
-    WriteLockScoped lockCodec(_codecWrapperLock);
-    ReadLockScoped lockNetEq(*_netEqDecodeLock);
-    InternalDestructEncoderInst(ptrInst);
+void ACMGenericCodec::DestructEncoderInst(void* ptr_inst) {
+  if (ptr_inst != NULL) {
+    WriteLockScoped lockCodec(codec_wrapper_lock_);
+    ReadLockScoped lockNetEq(*neteq_decode_lock_);
+    InternalDestructEncoderInst(ptr_inst);
   }
 }
 
-WebRtc_Word16 ACMGenericCodec::AudioBuffer(WebRtcACMAudioBuff& audioBuff) {
-  ReadLockScoped cs(_codecWrapperLock);
-  memcpy(audioBuff.inAudio, _inAudio,
-         AUDIO_BUFFER_SIZE_W16 * sizeof(WebRtc_Word16));
-  audioBuff.inAudioIxRead = _inAudioIxRead;
-  audioBuff.inAudioIxWrite = _inAudioIxWrite;
-  memcpy(audioBuff.inTimestamp, _inTimestamp,
-         TIMESTAMP_BUFFER_SIZE_W32 * sizeof(WebRtc_UWord32));
-  audioBuff.inTimestampIxWrite = _inTimestampIxWrite;
-  audioBuff.lastTimestamp = _lastTimestamp;
+// Get the current audio buffer including read and write states, and timestamps.
+int16_t ACMGenericCodec::AudioBuffer(WebRtcACMAudioBuff& audio_buff) {
+  ReadLockScoped cs(codec_wrapper_lock_);
+  memcpy(audio_buff.in_audio, in_audio_,
+         AUDIO_BUFFER_SIZE_W16 * sizeof(int16_t));
+  audio_buff.in_audio_ix_read = in_audio_ix_read_;
+  audio_buff.in_audio_ix_write = in_audio_ix_write_;
+  memcpy(audio_buff.in_timestamp, in_timestamp_,
+         TIMESTAMP_BUFFER_SIZE_W32 * sizeof(uint32_t));
+  audio_buff.in_timestamp_ix_write = in_timestamp_ix_write_;
+  audio_buff.last_timestamp = last_timestamp_;
   return 0;
 }
 
-WebRtc_Word16 ACMGenericCodec::SetAudioBuffer(WebRtcACMAudioBuff& audioBuff) {
-  WriteLockScoped cs(_codecWrapperLock);
-  memcpy(_inAudio, audioBuff.inAudio,
-         AUDIO_BUFFER_SIZE_W16 * sizeof(WebRtc_Word16));
-  _inAudioIxRead = audioBuff.inAudioIxRead;
-  _inAudioIxWrite = audioBuff.inAudioIxWrite;
-  memcpy(_inTimestamp, audioBuff.inTimestamp,
-         TIMESTAMP_BUFFER_SIZE_W32 * sizeof(WebRtc_UWord32));
-  _inTimestampIxWrite = audioBuff.inTimestampIxWrite;
-  _lastTimestamp = audioBuff.lastTimestamp;
-  _isAudioBuffFresh = false;
+// Set the audio buffer.
+int16_t ACMGenericCodec::SetAudioBuffer(WebRtcACMAudioBuff& audio_buff) {
+  WriteLockScoped cs(codec_wrapper_lock_);
+  memcpy(in_audio_, audio_buff.in_audio,
+         AUDIO_BUFFER_SIZE_W16 * sizeof(int16_t));
+  in_audio_ix_read_ = audio_buff.in_audio_ix_read;
+  in_audio_ix_write_ = audio_buff.in_audio_ix_write;
+  memcpy(in_timestamp_, audio_buff.in_timestamp,
+         TIMESTAMP_BUFFER_SIZE_W32 * sizeof(uint32_t));
+  in_timestamp_ix_write_ = audio_buff.in_timestamp_ix_write;
+  last_timestamp_ = audio_buff.last_timestamp;
+  is_audio_buff_fresh_ = false;
   return 0;
 }
 
-WebRtc_UWord32 ACMGenericCodec::LastEncodedTimestamp() const {
-  ReadLockScoped cs(_codecWrapperLock);
-  return _lastEncodedTimestamp;
+uint32_t ACMGenericCodec::LastEncodedTimestamp() const {
+  ReadLockScoped cs(codec_wrapper_lock_);
+  return last_encoded_timestamp_;
 }
 
-WebRtc_UWord32 ACMGenericCodec::EarliestTimestamp() const {
-  ReadLockScoped cs(_codecWrapperLock);
-  return _inTimestamp[0];
+uint32_t ACMGenericCodec::EarliestTimestamp() const {
+  ReadLockScoped cs(codec_wrapper_lock_);
+  return in_timestamp_[0];
 }
 
-WebRtc_Word16 ACMGenericCodec::SetVAD(const bool enableDTX,
-                                      const bool enableVAD,
-                                      const ACMVADMode mode) {
-  WriteLockScoped cs(_codecWrapperLock);
-  return SetVADSafe(enableDTX, enableVAD, mode);
+int16_t ACMGenericCodec::SetVAD(const bool enable_dtx,
+                                const bool enable_vad,
+                                const ACMVADMode mode) {
+  WriteLockScoped cs(codec_wrapper_lock_);
+  return SetVADSafe(enable_dtx, enable_vad, mode);
 }
 
-WebRtc_Word16 ACMGenericCodec::SetVADSafe(const bool enableDTX,
-                                          const bool enableVAD,
-                                          const ACMVADMode mode) {
-  if (enableDTX) {
-    // Make G729 AnnexB a special case
-    if (!STR_CASE_CMP(_encoderParams.codecInstant.plname, "G729")
-        && !_hasInternalDTX) {
+int16_t ACMGenericCodec::SetVADSafe(const bool enable_dtx,
+                                    const bool enable_vad,
+                                    const ACMVADMode mode) {
+  if (enable_dtx) {
+    // Make G729 AnnexB a special case.
+    if (!STR_CASE_CMP(encoder_params_.codec_inst.plname, "G729")
+        && !has_internal_dtx_) {
       if (ACMGenericCodec::EnableDTX() < 0) {
-        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                      "SetVADSafe: error in enable DTX");
         return -1;
       }
     } else {
       if (EnableDTX() < 0) {
-        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                      "SetVADSafe: error in enable DTX");
         return -1;
       }
     }
 
-    if (_hasInternalDTX) {
-      // Codec has internal DTX, practically we don't need WebRtc VAD,
-      // however, we let the user to turn it on if they need call-backs
-      // on silence. Store VAD mode for future even if VAD is off.
-      _vadMode = mode;
-      return (enableVAD) ? EnableVAD(mode) : DisableVAD();
+    if (has_internal_dtx_) {
+      // Codec has internal DTX, practically we don't need WebRtc VAD, however,
+      // we let the user to turn it on if they need call-backs on silence.
+      // Store VAD mode for future even if VAD is off.
+      vad_mode_ = mode;
+      return (enable_vad) ? EnableVAD(mode) : DisableVAD();
     } else {
-      // Codec does not have internal DTX so enabling DTX requires an
-      // active VAD. 'enableDTX == true' overwrites VAD status.
+      // Codec does not have internal DTX so enabling DTX requires an active
+      // VAD. 'enable_dtx == true' overwrites VAD status.
       if (EnableVAD(mode) < 0) {
-        // If we cannot create VAD we have to disable DTX
-        if (!_vadEnabled) {
+        // If we cannot create VAD we have to disable DTX.
+        if (!vad_enabled_) {
           DisableDTX();
         }
-        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                      "SetVADSafe: error in enable VAD");
         return -1;
       }
 
       // Return '1', to let the caller know VAD was turned on, even if the
-      // function was called with VAD='false'
-      if (enableVAD == false) {
+      // function was called with VAD='false'.
+      if (enable_vad == false) {
         return 1;
       } else {
         return 0;
       }
     }
   } else {
-    // Make G729 AnnexB a special case
-    if (!STR_CASE_CMP(_encoderParams.codecInstant.plname, "G729")
-        && !_hasInternalDTX) {
+    // Make G729 AnnexB a special case.
+    if (!STR_CASE_CMP(encoder_params_.codec_inst.plname, "G729")
+        && !has_internal_dtx_) {
       ACMGenericCodec::DisableDTX();
     } else {
       DisableDTX();
     }
-    return (enableVAD) ? EnableVAD(mode) : DisableVAD();
+    return (enable_vad) ? EnableVAD(mode) : DisableVAD();
   }
 }
 
-WebRtc_Word16 ACMGenericCodec::EnableDTX() {
-  if (_hasInternalDTX) {
-    // We should not be here if we have internal DTX
-    // this function should be overwritten by the derived
-    // class in this case
+int16_t ACMGenericCodec::EnableDTX() {
+  if (has_internal_dtx_) {
+    // We should not be here if we have internal DTX this function should be
+    // overloaded by the derived class in this case.
     return -1;
   }
-  if (!_dtxEnabled) {
-    if (WebRtcCng_CreateEnc(&_ptrDTXInst) < 0) {
-      _ptrDTXInst = NULL;
+  if (!dtx_enabled_) {
+    if (WebRtcCng_CreateEnc(&ptr_dtx_inst_) < 0) {
+      ptr_dtx_inst_ = NULL;
       return -1;
     }
-    WebRtc_UWord16 freqHz;
-    EncoderSampFreq(freqHz);
-    if (WebRtcCng_InitEnc(_ptrDTXInst, freqHz, ACM_SID_INTERVAL_MSEC,
-                          _numLPCParams) < 0) {
-      // Couldn't initialize, has to return -1, and free the memory
-      WebRtcCng_FreeEnc(_ptrDTXInst);
-      _ptrDTXInst = NULL;
+    uint16_t freq_hz;
+    EncoderSampFreq(freq_hz);
+    if (WebRtcCng_InitEnc(ptr_dtx_inst_, freq_hz, kCngSidIntervalMsec,
+                          num_lpc_params_) < 0) {
+      // Couldn't initialize, has to return -1, and free the memory.
+      WebRtcCng_FreeEnc(ptr_dtx_inst_);
+      ptr_dtx_inst_ = NULL;
       return -1;
     }
-    _dtxEnabled = true;
+    dtx_enabled_ = true;
   }
   return 0;
 }
 
-WebRtc_Word16 ACMGenericCodec::DisableDTX() {
-  if (_hasInternalDTX) {
-    // We should not be here if we have internal DTX
-    // this function should be overwritten by the derived
-    // class in this case
+int16_t ACMGenericCodec::DisableDTX() {
+  if (has_internal_dtx_) {
+    // We should not be here if we have internal DTX this function should be
+    // overloaded by the derived class in this case.
     return -1;
   }
-  if (_ptrDTXInst != NULL) {
-    WebRtcCng_FreeEnc(_ptrDTXInst);
-    _ptrDTXInst = NULL;
+  if (ptr_dtx_inst_ != NULL) {
+    WebRtcCng_FreeEnc(ptr_dtx_inst_);
+    ptr_dtx_inst_ = NULL;
   }
-  _dtxEnabled = false;
+  dtx_enabled_ = false;
   return 0;
 }
 
-WebRtc_Word16 ACMGenericCodec::EnableVAD(ACMVADMode mode) {
+int16_t ACMGenericCodec::EnableVAD(ACMVADMode mode) {
   if ((mode < VADNormal) || (mode > VADVeryAggr)) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                  "EnableVAD: error in VAD mode range");
     return -1;
   }
 
-  if (!_vadEnabled) {
-    if (WebRtcVad_Create(&_ptrVADInst) < 0) {
-      _ptrVADInst = NULL;
-      WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+  if (!vad_enabled_) {
+    if (WebRtcVad_Create(&ptr_vad_inst_) < 0) {
+      ptr_vad_inst_ = NULL;
+      WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                    "EnableVAD: error in create VAD");
       return -1;
     }
-    if (WebRtcVad_Init(_ptrVADInst) < 0) {
-      WebRtcVad_Free(_ptrVADInst);
-      _ptrVADInst = NULL;
-      WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+    if (WebRtcVad_Init(ptr_vad_inst_) < 0) {
+      WebRtcVad_Free(ptr_vad_inst_);
+      ptr_vad_inst_ = NULL;
+      WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                    "EnableVAD: error in init VAD");
       return -1;
     }
   }
 
-  // Set the vad mode to the given value
-  if (WebRtcVad_set_mode(_ptrVADInst, mode) < 0) {
-    // We failed to set the mode and we have to return -1. If
-    // we already have a working VAD (_vadEnabled == true) then
-    // we leave it to work. otherwise, the following will be
-    // executed.
-    if (!_vadEnabled) {
-      // We just created the instance but cannot set the mode
-      // we have to free the memomry.
-      WebRtcVad_Free(_ptrVADInst);
-      _ptrVADInst = NULL;
+  // Set the VAD mode to the given value.
+  if (WebRtcVad_set_mode(ptr_vad_inst_, mode) < 0) {
+    // We failed to set the mode and we have to return -1. If we already have a
+    // working VAD (vad_enabled_ == true) then we leave it to work. Otherwise,
+    // the following will be executed.
+    if (!vad_enabled_) {
+      // We just created the instance but cannot set the mode we have to free
+      // the memory.
+      WebRtcVad_Free(ptr_vad_inst_);
+      ptr_vad_inst_ = NULL;
     }
-    WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceAudioCoding, _uniqueID,
+    WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceAudioCoding, unique_id_,
                  "EnableVAD: failed to set the VAD mode");
     return -1;
   }
-  _vadMode = mode;
-  _vadEnabled = true;
+  vad_mode_ = mode;
+  vad_enabled_ = true;
   return 0;
 }
 
-WebRtc_Word16 ACMGenericCodec::DisableVAD() {
-  if (_ptrVADInst != NULL) {
-    WebRtcVad_Free(_ptrVADInst);
-    _ptrVADInst = NULL;
+int16_t ACMGenericCodec::DisableVAD() {
+  if (ptr_vad_inst_ != NULL) {
+    WebRtcVad_Free(ptr_vad_inst_);
+    ptr_vad_inst_ = NULL;
   }
-  _vadEnabled = false;
+  vad_enabled_ = false;
   return 0;
 }
 
-WebRtc_Word32 ACMGenericCodec::ReplaceInternalDTX(
-    const bool replaceInternalDTX) {
-  WriteLockScoped cs(_codecWrapperLock);
-  return ReplaceInternalDTXSafe(replaceInternalDTX);
+int32_t ACMGenericCodec::ReplaceInternalDTX(const bool replace_internal_dtx) {
+  WriteLockScoped cs(codec_wrapper_lock_);
+  return ReplaceInternalDTXSafe(replace_internal_dtx);
 }
 
-WebRtc_Word32 ACMGenericCodec::ReplaceInternalDTXSafe(
-    const bool /* replaceInternalDTX */) {
+int32_t ACMGenericCodec::ReplaceInternalDTXSafe(
+    const bool /* replace_internal_dtx */) {
   return -1;
 }
 
-WebRtc_Word32 ACMGenericCodec::IsInternalDTXReplaced(
-    bool* internalDTXReplaced) {
-  WriteLockScoped cs(_codecWrapperLock);
-  return IsInternalDTXReplacedSafe(internalDTXReplaced);
+int32_t ACMGenericCodec::IsInternalDTXReplaced(bool* internal_dtx_replaced) {
+  WriteLockScoped cs(codec_wrapper_lock_);
+  return IsInternalDTXReplacedSafe(internal_dtx_replaced);
 }
 
-WebRtc_Word32 ACMGenericCodec::IsInternalDTXReplacedSafe(
-    bool* internalDTXReplaced) {
-  *internalDTXReplaced = false;
+int32_t ACMGenericCodec::IsInternalDTXReplacedSafe(
+    bool* internal_dtx_replaced) {
+  *internal_dtx_replaced = false;
   return 0;
 }
 
-WebRtc_Word16 ACMGenericCodec::ProcessFrameVADDTX(
-    WebRtc_UWord8* bitStream, WebRtc_Word16* bitStreamLenByte,
-    WebRtc_Word16* samplesProcessed) {
-  if (!_vadEnabled) {
-    // VAD not enabled, set all vadLable[] to 1 (speech detected)
-    for (WebRtc_Word16 n = 0; n < MAX_FRAME_SIZE_10MSEC; n++) {
-      _vadLabel[n] = 1;
+int16_t ACMGenericCodec::ProcessFrameVADDTX(uint8_t* bitstream,
+                                            int16_t* bitstream_len_byte,
+                                            int16_t* samples_processed) {
+  if (!vad_enabled_) {
+    // VAD not enabled, set all |vad_lable_[]| to 1 (speech detected).
+    for (int n = 0; n < MAX_FRAME_SIZE_10MSEC; n++) {
+      vad_label_[n] = 1;
     }
-    *samplesProcessed = 0;
+    *samples_processed = 0;
     return 0;
   }
 
-  WebRtc_UWord16 freqHz;
-  EncoderSampFreq(freqHz);
+  uint16_t freq_hz;
+  EncoderSampFreq(freq_hz);
 
-  // Calculate number of samples in 10 ms blocks, and number ms in one frame
-  WebRtc_Word16 samplesIn10Msec = (WebRtc_Word16)(freqHz / 100);
-  WebRtc_Word32 frameLenMsec = (((WebRtc_Word32) _frameLenSmpl * 1000) /
-      freqHz);
-  WebRtc_Word16 status;
+  // Calculate number of samples in 10 ms blocks, and number ms in one frame.
+  int16_t samples_in_10ms = static_cast<int16_t>(freq_hz / 100);
+  int32_t frame_len_ms = static_cast<int32_t>(frame_len_smpl_) * 1000 / freq_hz;
+  int16_t status;
 
   // Vector for storing maximum 30 ms of mono audio at 48 kHz.
-  WebRtc_Word16 audio[1440];
+  int16_t audio[1440];
 
   // Calculate number of VAD-blocks to process, and number of samples in each
   // block.
-  int noSamplesToProcess[2];
-  if (frameLenMsec == 40) {
-    // 20 ms in each VAD block
-    noSamplesToProcess[0] = noSamplesToProcess[1] = 2 * samplesIn10Msec;
+  int num_samples_to_process[2];
+  if (frame_len_ms == 40) {
+    // 20 ms in each VAD block.
+    num_samples_to_process[0] = num_samples_to_process[1] = 2 * samples_in_10ms;
   } else {
     // For 10-30 ms framesizes, second VAD block will be size zero ms,
     // for 50 and 60 ms first VAD block will be 30 ms.
-    noSamplesToProcess[0] =
-        (frameLenMsec > 30) ? 3 * samplesIn10Msec : _frameLenSmpl;
-    noSamplesToProcess[1] = _frameLenSmpl - noSamplesToProcess[0];
+    num_samples_to_process[0] =
+        (frame_len_ms > 30) ? 3 * samples_in_10ms : frame_len_smpl_;
+    num_samples_to_process[1] = frame_len_smpl_ - num_samples_to_process[0];
   }
 
-  int offSet = 0;
-  int loops = (noSamplesToProcess[1] > 0) ? 2 : 1;
+  int offset = 0;
+  int loops = (num_samples_to_process[1] > 0) ? 2 : 1;
   for (int i = 0; i < loops; i++) {
-    // If stereo, calculate mean of the two channels
-    if (_noChannels == 2) {
-      for (int j = 0; j < noSamplesToProcess[i]; j++) {
-        audio[j] = (_inAudio[(offSet + j) * 2] +
-            _inAudio[(offSet + j) * 2 + 1]) / 2;
+    // TODO(turajs): Do we need to care about VAD together with stereo?
+    // If stereo, calculate mean of the two channels.
+    if (num_channels_ == 2) {
+      for (int j = 0; j < num_samples_to_process[i]; j++) {
+        audio[j] = (in_audio_[(offset + j) * 2] +
+            in_audio_[(offset + j) * 2 + 1]) / 2;
       }
-      offSet = noSamplesToProcess[0];
+      offset = num_samples_to_process[0];
     } else {
-      // Mono, copy data from _inAudio to continue work on
-      memcpy(audio, _inAudio, sizeof(WebRtc_Word16) * noSamplesToProcess[i]);
+      // Mono, copy data from in_audio_ to continue work on.
+      memcpy(audio, in_audio_, sizeof(int16_t) * num_samples_to_process[i]);
     }
 
-    // Call VAD
-    status = (WebRtc_Word16) WebRtcVad_Process(_ptrVADInst, (int) freqHz, audio,
-                                               noSamplesToProcess[i]);
-
-    _vadLabel[i] = status;
+    // Call VAD.
+    status = static_cast<int16_t>(WebRtcVad_Process(ptr_vad_inst_,
+                                                    static_cast<int>(freq_hz),
+                                                    audio,
+                                                    num_samples_to_process[i]));
+    vad_label_[i] = status;
 
     if (status < 0) {
-      // This will force that the data be removed from the buffer
-      *samplesProcessed += noSamplesToProcess[i];
+      // This will force that the data be removed from the buffer.
+      *samples_processed += num_samples_to_process[i];
       return -1;
     }
 
@@ -1119,41 +1106,41 @@ WebRtc_Word16 ACMGenericCodec::ProcessFrameVADDTX(
     // first part of a frame gets the VAD decision "inactive". Otherwise DTX
     // might say it is time to transmit SID frame, but we will encode the whole
     // frame, because the first part is active.
-    *samplesProcessed = 0;
-    if ((status == 0) && (i == 0) && _dtxEnabled && !_hasInternalDTX) {
-      WebRtc_Word16 bitStreamLen;
-      WebRtc_Word16 num10MsecFrames = noSamplesToProcess[i] / samplesIn10Msec;
-      *bitStreamLenByte = 0;
-      for (WebRtc_Word16 n = 0; n < num10MsecFrames; n++) {
+    *samples_processed = 0;
+    if ((status == 0) && (i == 0) && dtx_enabled_ && !has_internal_dtx_) {
+      int16_t bitstream_len;
+      int num_10ms_frames = num_samples_to_process[i] / samples_in_10ms;
+      *bitstream_len_byte = 0;
+      for (int n = 0; n < num_10ms_frames; n++) {
         // This block is (passive) && (vad enabled). If first CNG after
         // speech, force SID by setting last parameter to "1".
-        status = WebRtcCng_Encode(_ptrDTXInst, &audio[n * samplesIn10Msec],
-                                  samplesIn10Msec, bitStream, &bitStreamLen,
-                                  !_prev_frame_cng);
+        status = WebRtcCng_Encode(ptr_dtx_inst_, &audio[n * samples_in_10ms],
+                                  samples_in_10ms, bitstream, &bitstream_len,
+                                  !prev_frame_cng_);
         if (status < 0) {
           return -1;
         }
 
         // Update previous frame was CNG.
-        _prev_frame_cng = 1;
+        prev_frame_cng_ = 1;
 
-        *samplesProcessed += samplesIn10Msec * _noChannels;
+        *samples_processed += samples_in_10ms * num_channels_;
 
-        // bitStreamLen will only be > 0 once per 100 ms
-        *bitStreamLenByte += bitStreamLen;
+        // |bitstream_len_byte| will only be > 0 once per 100 ms.
+        *bitstream_len_byte += bitstream_len;
       }
 
-      // Check if all samples got processed by the DTX
-      if (*samplesProcessed != noSamplesToProcess[i] * _noChannels) {
+      // Check if all samples got processed by the DTX.
+      if (*samples_processed != num_samples_to_process[i] * num_channels_) {
         // Set to zero since something went wrong. Shouldn't happen.
-        *samplesProcessed = 0;
+        *samples_processed = 0;
       }
     } else {
       // Update previous frame was not CNG.
-      _prev_frame_cng = 0;
+      prev_frame_cng_ = 0;
     }
 
-    if (*samplesProcessed > 0) {
+    if (*samples_processed > 0) {
       // The block contains inactive speech, and is processed by DTX.
       // Discontinue running VAD.
       break;
@@ -1163,88 +1150,89 @@ WebRtc_Word16 ACMGenericCodec::ProcessFrameVADDTX(
   return status;
 }
 
-WebRtc_Word16 ACMGenericCodec::SamplesLeftToEncode() {
-  ReadLockScoped rl(_codecWrapperLock);
-  return (_frameLenSmpl <= _inAudioIxWrite) ? 0 :
-      (_frameLenSmpl - _inAudioIxWrite);
+int16_t ACMGenericCodec::SamplesLeftToEncode() {
+  ReadLockScoped rl(codec_wrapper_lock_);
+  return (frame_len_smpl_ <= in_audio_ix_write_) ? 0 :
+      (frame_len_smpl_ - in_audio_ix_write_);
 }
 
-void ACMGenericCodec::SetUniqueID(const WebRtc_UWord32 id) {
-  _uniqueID = id;
+void ACMGenericCodec::SetUniqueID(const uint32_t id) {
+  unique_id_ = id;
 }
 
 bool ACMGenericCodec::IsAudioBufferFresh() const {
-  ReadLockScoped rl(_codecWrapperLock);
-  return _isAudioBuffFresh;
+  ReadLockScoped rl(codec_wrapper_lock_);
+  return is_audio_buff_fresh_;
 }
 
-// This function is replaced by codec specific functions for some codecs
-WebRtc_Word16 ACMGenericCodec::EncoderSampFreq(WebRtc_UWord16& sampFreqHz) {
-  WebRtc_Word32 f;
-  f = ACMCodecDB::CodecFreq(_codecID);
+// This function is replaced by codec specific functions for some codecs.
+int16_t ACMGenericCodec::EncoderSampFreq(uint16_t& samp_freq_hz) {
+  int32_t f;
+  f = ACMCodecDB::CodecFreq(codec_id_);
   if (f < 0) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                  "EncoderSampFreq: codec frequency is negative");
     return -1;
   } else {
-    sampFreqHz = (WebRtc_UWord16) f;
+    samp_freq_hz = static_cast<uint16_t>(f);
     return 0;
   }
 }
 
-WebRtc_Word32 ACMGenericCodec::ConfigISACBandwidthEstimator(
-    const WebRtc_UWord8 /* initFrameSizeMsec */,
-    const WebRtc_UWord16 /* initRateBitPerSec */,
-    const bool /* enforceFrameSize  */) {
-  WEBRTC_TRACE(webrtc::kTraceWarning, webrtc::kTraceAudioCoding, _uniqueID,
-      "The send-codec is not iSAC, failed to config iSAC bandwidth estimator.");
+int32_t ACMGenericCodec::ConfigISACBandwidthEstimator(
+    const uint8_t /* init_frame_size_msec */,
+    const uint16_t /* init_rate_bit_per_sec */,
+    const bool /* enforce_frame_size  */) {
+  WEBRTC_TRACE(webrtc::kTraceWarning, webrtc::kTraceAudioCoding, unique_id_,
+               "The send-codec is not iSAC, failed to config iSAC bandwidth "
+               "estimator.");
   return -1;
 }
 
-WebRtc_Word32 ACMGenericCodec::SetISACMaxRate(
-    const WebRtc_UWord32 /* maxRateBitPerSec */) {
-  WEBRTC_TRACE(webrtc::kTraceWarning, webrtc::kTraceAudioCoding, _uniqueID,
+int32_t ACMGenericCodec::SetISACMaxRate(
+    const uint32_t /* max_rate_bit_per_sec */) {
+  WEBRTC_TRACE(webrtc::kTraceWarning, webrtc::kTraceAudioCoding, unique_id_,
                "The send-codec is not iSAC, failed to set iSAC max rate.");
   return -1;
 }
 
-WebRtc_Word32 ACMGenericCodec::SetISACMaxPayloadSize(
-    const WebRtc_UWord16 /* maxPayloadLenBytes */) {
-  WEBRTC_TRACE(webrtc::kTraceWarning, webrtc::kTraceAudioCoding, _uniqueID,
-      "The send-codec is not iSAC, failed to set iSAC max payload-size.");
+int32_t ACMGenericCodec::SetISACMaxPayloadSize(
+    const uint16_t /* max_payload_len_bytes */) {
+  WEBRTC_TRACE(webrtc::kTraceWarning, webrtc::kTraceAudioCoding, unique_id_,
+               "The send-codec is not iSAC, failed to set iSAC max "
+               "payload-size.");
   return -1;
 }
 
 void ACMGenericCodec::SaveDecoderParam(
-    const WebRtcACMCodecParams* codecParams) {
-  WriteLockScoped wl(_codecWrapperLock);
-  SaveDecoderParamSafe(codecParams);
+    const WebRtcACMCodecParams* codec_params) {
+  WriteLockScoped wl(codec_wrapper_lock_);
+  SaveDecoderParamSafe(codec_params);
 }
 
 void ACMGenericCodec::SaveDecoderParamSafe(
-    const WebRtcACMCodecParams* codecParams) {
-  memcpy(&_decoderParams, codecParams, sizeof(WebRtcACMCodecParams));
+    const WebRtcACMCodecParams* codec_params) {
+  memcpy(&decoder_params_, codec_params, sizeof(WebRtcACMCodecParams));
 }
 
-WebRtc_Word16 ACMGenericCodec::UpdateEncoderSampFreq(
-    WebRtc_UWord16 /* encoderSampFreqHz */) {
-  WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
-      "It is asked for a change in smapling frequency while the current "
-      "send-codec supports only one sampling rate.");
+int16_t ACMGenericCodec::UpdateEncoderSampFreq(
+    uint16_t /* samp_freq_hz */) {
+  WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
+               "It is asked for a change in smapling frequency while the "
+               "current  send-codec supports only one sampling rate.");
   return -1;
 }
 
-void ACMGenericCodec::SetIsMaster(bool isMaster) {
-  WriteLockScoped wl(_codecWrapperLock);
-  _isMaster = isMaster;
+void ACMGenericCodec::SetIsMaster(bool is_master) {
+  WriteLockScoped wl(codec_wrapper_lock_);
+  is_master_ = is_master;
 }
 
-WebRtc_Word16 ACMGenericCodec::REDPayloadISAC(
-    const WebRtc_Word32 /* isacRate        */,
-    const WebRtc_Word16 /* isacBwEstimate  */,
-    WebRtc_UWord8* /* payload         */,
-    WebRtc_Word16* /* payloadLenBytes */) {
-  WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+int16_t ACMGenericCodec::REDPayloadISAC(const int32_t /* isac_rate */,
+                                        const int16_t /* isac_bw_estimate */,
+                                        uint8_t* /* payload */,
+                                        int16_t* /* payload_len_bytes */) {
+  WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, unique_id_,
                "Error: REDPayloadISAC is an iSAC specific function");
   return -1;
 }

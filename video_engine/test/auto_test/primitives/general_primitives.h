@@ -25,6 +25,11 @@ class ViERTP_RTCP;
 struct VideoCodec;
 }
 
+enum ProtectionMethod {
+  kNack,
+  kHybridNackFec,
+};
+
 // This constant can be used as input to various functions to not force the
 // codec resolution.
 const int kDoNotForceResolution = 0;
@@ -55,15 +60,9 @@ void RenderToFile(webrtc::ViERender* renderer_interface,
                   int frame_provider_id,
                   ViEToFileRenderer* to_file_renderer);
 
-// Stops all rendering given the normal case that we have a capture device
-// and a video channel set up for rendering.
-void StopAndRemoveRenderers(webrtc::ViEBase* base_interface,
-                            webrtc::ViERender* render_interface,
-                            int channel_id,
-                            int capture_id);
-
 // Configures RTP-RTCP.
 void ConfigureRtpRtcp(webrtc::ViERTP_RTCP* rtcp_interface,
+                      ProtectionMethod protection_method,
                       int video_channel);
 
 // Finds a codec in the codec list. Returns true on success, false otherwise.

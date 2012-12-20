@@ -124,10 +124,6 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
     virtual WebRtc_Word32 DeregisterSendRtpHeaderExtension(
         const RTPExtensionType type);
 
-    virtual void SetTransmissionSmoothingStatus(const bool enable);
-
-    virtual bool TransmissionSmoothingStatus() const;
-
     // get start timestamp
     virtual WebRtc_UWord32 StartTimestamp() const;
 
@@ -185,6 +181,8 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
         const RTPFragmentationHeader* fragmentation = NULL,
         const RTPVideoHeader* rtpVideoHdr = NULL);
 
+    virtual void TimeToSendPacket(uint32_t ssrc, uint16_t sequence_number,
+                                  int64_t capture_time_ms);
     /*
     *   RTCP
     */
@@ -226,6 +224,8 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
 
     // Reset RoundTripTime statistics
     virtual WebRtc_Word32 ResetRTT(const WebRtc_UWord32 remoteSSRC);
+
+    virtual void SetRtt(uint32_t rtt);
 
     // Force a send of an RTCP packet
     // normal SR and RR are triggered via the process function
@@ -510,6 +510,8 @@ private:
     KeyFrameRequestMethod _keyFrameReqMethod;
 
     RemoteBitrateEstimator* remote_bitrate_;
+
+    RtcpRttObserver* rtt_observer_;
 
 #ifdef MATLAB
     MatlabPlot*           _plot1;

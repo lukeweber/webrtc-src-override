@@ -26,11 +26,13 @@
 #include "vie_base.h"
 #include "vie_codec.h"
 #include "vie_capture.h"
+#include "vie_external_codec.h"
 #include "vie_network.h"
 #include "vie_render.h"
 #include "vie_rtp_rtcp.h"
 
 #include "common_types.h"
+#include "android_media_codec_decoder.h"
 
 #define WEBRTC_LOG_TAG "*WEBRTCN*"
 #define VALIDATE_BASE_POINTER                                           \
@@ -118,6 +120,7 @@ typedef struct
   ViERTP_RTCP* rtp;
   ViERender* render;
   ViECapture* capture;
+  ViEExternalCodec* externalCodec;
   VideoCallbackAndroid* callback;
 
 } VideoEngineData;
@@ -335,6 +338,13 @@ JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_GetVideo
     return -1;
   }
 
+  vieData.externalCodec = ViEExternalCodec::GetInterface(vieData.vie);
+  if (!vieData.capture) {
+    __android_log_write(ANDROID_LOG_ERROR, WEBRTC_LOG_TAG,
+                        "Get External Codec sub-API failed");
+    return -1;
+  }
+
   return 0;
 }
 
@@ -438,6 +448,11 @@ JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_Terminat
     if (!vieData.base || vieData.base->Release() != 0) {
       __android_log_write(ANDROID_LOG_ERROR, WEBRTC_LOG_TAG,
                           "Failed to release Base sub-API");
+    }
+
+    if (!vieData.externalCodec || vieData.externalCodec->Release()) {
+      __android_log_write(ANDROID_LOG_ERROR, WEBRTC_LOG_TAG,
+                          "Failed to release External Codec sub-API");
     }
 
     // Delete Vie
@@ -958,6 +973,32 @@ JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_SetRotat
 
   int ret = vieData.capture->SetRotateCapturedFrames(captureId, rotation);
   return ret;
+}
+
+/*
+ * Class:     org_webrtc_videoengineapp_ViEAndroidJavaAPI
+ * Method:    SetExternalMediaCodecDecoderRenderer
+ * Signature: (ILjava/lang/Object;)I
+ */
+JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_SetExternalMediaCodecDecoderRenderer(
+    JNIEnv *env,
+    jobject,
+    jint channel,
+    jobject glSurface)
+{
+  __android_log_write(
+      ANDROID_LOG_DEBUG, WEBRTC_LOG_TAG, "SetExternalMediaCodecDecoder");
+
+  jclass cls = env->FindClass("org/webrtc/videoengine/ViEMediaCodecDecoder");
+  env->NewGlobalRef(cls);
+
+  AndroidMediaCodecDecoder* mediaCodecDecoder =
+      new AndroidMediaCodecDecoder(webrtcGlobalVM, glSurface, cls);
+
+  // TODO(dwkang): Check the ownership of decoder object and release it
+  //               if needed.
+  return vieData.externalCodec->RegisterExternalReceiveCodec(
+      channel, 120, mediaCodecDecoder, true);
 }
 
 /*
@@ -1525,7 +1566,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_
   jobjectArray ret;
   int i;
   int num = voeData.codec->NumOfCodecs();
-  char info[32];
+  char info[256];
 
   ret = (jobjectArray)env->NewObjectArray(
       num,
@@ -1535,10 +1576,14 @@ JNIEXPORT jobjectArray JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_
   for(i = 0; i < num; i++) {
     webrtc::CodecInst codecToList;
     voeData.codec->GetCodec(i, codecToList);
+    int written = snprintf(info, sizeof(info),
+                           "%s type:%d freq:%d pac:%d ch:%d rate:%d",
+                           codecToList.plname, codecToList.pltype,
+                           codecToList.plfreq, codecToList.pacsize,
+                           codecToList.channels, codecToList.rate);
+    assert(written >= 0 && written < sizeof(info));
     __android_log_print(ANDROID_LOG_DEBUG, WEBRTC_LOG_TAG,
-                        "VoiceEgnine Codec[%d] %s, pltype=%d\n",
-                        i, codecToList.plname, codecToList.pltype);
-    sprintf(info, "%s pltype:%d", codecToList.plname, codecToList.pltype);
+                        "VoiceEgnine Codec[%d] %s", i, info);
     env->SetObjectArrayElement(ret, i, env->NewStringUTF( info ));
   }
 

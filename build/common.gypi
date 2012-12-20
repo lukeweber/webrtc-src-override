@@ -91,6 +91,9 @@
         # Disable the use of protocol buffers in production code.
         'enable_protobuf%': 0,
 
+        'enable_tracing%': 0,
+
+        'enable_android_opensl%': 0,
       }, {  # Settings for the standalone (not-in-Chromium) build.
         'include_pulse_audio%': 1,
         'include_internal_audio_device%': 1,
@@ -98,6 +101,7 @@
         'include_internal_video_render%': 1,
         'include_video_engine_file_api%': 1,
         'enable_protobuf%': 1,
+        'enable_tracing%': 1,
         'include_tests%': 1,
 
         # TODO(andrew): For now, disable the Chrome plugins, which causes a
@@ -107,7 +111,7 @@
 
         # Switch between Android audio device OpenSL ES implementation
         # and Java Implementation
-        'enable_android_opensl%': 1,
+        'enable_android_opensl%': 0,
       }],
       ['OS=="ios"', {
         'enable_video%': 0,
@@ -135,6 +139,9 @@
       #'WEBRTC_SVNREVISION="<!(python <(webrtc_root)/build/version.py)"',
     ],
     'conditions': [
+      ['enable_tracing==1', {
+        'defines': ['WEBRTC_LOGGING',],
+      }],
       ['build_with_mozilla==1', {
         'defines': [
           # Changes settings for Mozilla build.

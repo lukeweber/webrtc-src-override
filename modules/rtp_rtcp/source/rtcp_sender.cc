@@ -15,7 +15,6 @@
 #include <string.h>  // memcpy
 
 #include "common_types.h"
-#include "modules/remote_bitrate_estimator/remote_rate_control.h"
 #include "modules/rtp_rtcp/source/rtp_rtcp_impl.h"
 #include "system_wrappers/interface/critical_section_wrapper.h"
 #include "system_wrappers/interface/trace.h"
@@ -134,7 +133,6 @@ RTCPSender::Init()
     _sequenceNumberFIR = 0;
     _tmmbr_Send = 0;
     _packetOH_Send = 0;
-    //_remoteRateControl.Reset();
     _nextTimeToSendRTCP = 0;
     _CSRCs = 0;
     _appSend = false;
@@ -330,7 +328,6 @@ RTCPSender::SetRemoteSSRC( const WebRtc_UWord32 ssrc)
 {
     CriticalSectionScoped lock(_criticalSectionRTCPSender);
     _remoteSSRC = ssrc;
-    //_remoteRateControl.Reset();
     return 0;
 }
 
@@ -524,6 +521,12 @@ WebRtc_Word32 RTCPSender::AddReportBlock(const WebRtc_UWord32 SSRC,
     WEBRTC_TRACE(kTraceError, kTraceRtpRtcp, _id,
                  "%s invalid argument", __FUNCTION__);
     return -1;
+  }
+  std::map<WebRtc_UWord32, RTCPReportBlock*>::iterator it =
+      _reportBlocks.find(SSRC);
+  if (it != _reportBlocks.end()) {
+    delete it->second;
+    _reportBlocks.erase(it);
   }
   RTCPReportBlock* copyReportBlock = new RTCPReportBlock();
   memcpy(copyReportBlock, reportBlock, sizeof(RTCPReportBlock));

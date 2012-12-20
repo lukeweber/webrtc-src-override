@@ -44,7 +44,7 @@ int main(int argc, char* argv[])
 {
 
     char inname[100], outname[100], bottleneck_file[100], vadfile[100];
-	FILE *inp, *outp, *f_bn=NULL, *vadp, *bandwidthp;
+	FILE *inp, *outp, *f_bn = NULL, *vadp = NULL, *bandwidthp;
 	int framecnt, endfile;
 
 	int i, errtype, VADusage = 0, packetLossPercent = 0;
@@ -100,8 +100,8 @@ int main(int argc, char* argv[])
     WebRtc_UWord32 numTransCodingBytes = 0;
 
 	/* only one structure used for ISAC encoder */
-	ISACStruct* ISAC_main_inst;
-    ISACStruct* decoderTransCoding;
+	ISACStruct* ISAC_main_inst = NULL;
+    ISACStruct* decoderTransCoding = NULL;
 
 	BottleNeckModel       BN_data;
 
@@ -477,8 +477,9 @@ int main(int argc, char* argv[])
         if(!useAssign)
         {
             err =WebRtcIsac_Create(&ISAC_main_inst);
-            WebRtcIsac_SetEncSampRate(ISAC_main_inst, (sampFreqKHz == 16)? kIsacWideband:kIsacSuperWideband);
-            WebRtcIsac_SetDecSampRate(ISAC_main_inst, (sampFreqKHz == 16)? kIsacWideband:kIsacSuperWideband);
+            WebRtcIsac_SetEncSampRate(ISAC_main_inst, sampFreqKHz * 1000);
+            WebRtcIsac_SetDecSampRate(ISAC_main_inst, sampFreqKHz >= 32 ?
+                32000 : 16000);
         }
         else
         {
@@ -488,8 +489,9 @@ int main(int argc, char* argv[])
             err = WebRtcIsac_AssignSize(&sss);
             ppp = malloc(sss);
             err = WebRtcIsac_Assign(&ISAC_main_inst, ppp);
-            WebRtcIsac_SetEncSampRate(ISAC_main_inst, (sampFreqKHz == 16)? kIsacWideband:kIsacSuperWideband);
-            WebRtcIsac_SetDecSampRate(ISAC_main_inst, (sampFreqKHz == 16)? kIsacWideband:kIsacSuperWideband);
+            WebRtcIsac_SetEncSampRate(ISAC_main_inst, sampFreqKHz * 1000);
+            WebRtcIsac_SetDecSampRate(ISAC_main_inst, sampFreqKHz >= 32 ?
+                32000 : 16000);
         }
         /* Error check */
         if(err < 0)
@@ -510,8 +512,9 @@ int main(int argc, char* argv[])
     if(doTransCoding)
     {
         WebRtcIsac_Create(&decoderTransCoding);
-        WebRtcIsac_SetEncSampRate(decoderTransCoding, (sampFreqKHz == 16)? kIsacWideband:kIsacSuperWideband);
-        WebRtcIsac_SetDecSampRate(decoderTransCoding, (sampFreqKHz == 16)? kIsacWideband:kIsacSuperWideband);
+        WebRtcIsac_SetEncSampRate(decoderTransCoding, sampFreqKHz * 1000);
+        WebRtcIsac_SetDecSampRate(decoderTransCoding, sampFreqKHz >= 32 ?
+            32000 : 16000);
         WebRtcIsac_DecoderInit(decoderTransCoding);
         transCodingFile = fopen(transCodingFileName, "wb");
         if(transCodingFile == NULL)

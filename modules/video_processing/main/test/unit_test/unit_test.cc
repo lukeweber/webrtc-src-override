@@ -14,7 +14,7 @@
 
 #include "common_video/libyuv/include/webrtc_libyuv.h"
 #include "system_wrappers/interface/tick_util.h"
-#include "testsupport/fileutils.h"
+#include "test/testsupport/fileutils.h"
 
 namespace webrtc {
 
@@ -213,20 +213,29 @@ TEST_F(VideoProcessingModuleTest, FrameStats)
 
 TEST_F(VideoProcessingModuleTest, PreprocessorLogic)
 {
-  // Disable temporal sampling
+  // Disable temporal sampling (frame dropping).
   _vpm->EnableTemporalDecimation(false);
-  ASSERT_EQ(VPM_OK, _vpm->SetMaxFrameRate(30));
-  ASSERT_EQ(VPM_OK, _vpm->SetTargetResolution(100, 100, 15));
-  // Revert
-  _vpm->EnableTemporalDecimation(true);
-  ASSERT_EQ(VPM_OK, _vpm->SetTargetResolution(100, 100, 30));
-  // Disable spatial sampling
+  int resolution = 100;
+  EXPECT_EQ(VPM_OK, _vpm->SetMaxFrameRate(30));
+  EXPECT_EQ(VPM_OK, _vpm->SetTargetResolution(resolution, resolution, 15));
+  EXPECT_EQ(VPM_OK, _vpm->SetTargetResolution(resolution, resolution, 30));
+  // Disable spatial sampling.
   _vpm->SetInputFrameResampleMode(kNoRescaling);
-  ASSERT_EQ(VPM_OK, _vpm->SetTargetResolution(100, 100, 30));
-  I420VideoFrame *outFrame = NULL;
-  ASSERT_EQ(VPM_OK, _vpm->PreprocessFrame(_videoFrame, &outFrame));
-  // No rescaling=> output frame = NULL
-  ASSERT_TRUE(outFrame == NULL);
+  EXPECT_EQ(VPM_OK, _vpm->SetTargetResolution(resolution, resolution, 30));
+  I420VideoFrame* outFrame = NULL;
+  // Set rescaling => output frame != NULL.
+  _vpm->SetInputFrameResampleMode(kFastRescaling);
+  EXPECT_EQ(VPM_OK, _vpm->SetTargetResolution(resolution, resolution, 30));
+  EXPECT_EQ(VPM_OK, _vpm->PreprocessFrame(_videoFrame, &outFrame));
+  EXPECT_FALSE(outFrame == NULL);
+  if (outFrame) {
+    EXPECT_EQ(resolution, outFrame->width());
+    EXPECT_EQ(resolution, outFrame->height());
+  }
+  // No rescaling=> output frame = NULL.
+  _vpm->SetInputFrameResampleMode(kNoRescaling);
+  EXPECT_EQ(VPM_OK, _vpm->PreprocessFrame(_videoFrame, &outFrame));
+  EXPECT_TRUE(outFrame == NULL);
 }
 
 TEST_F(VideoProcessingModuleTest, Resampler)
@@ -265,6 +274,10 @@ TEST_F(VideoProcessingModuleTest, Resampler)
     // initiate test timer
     t0 = TickTime::Now();
 
+    // Init the sourceFrame with a timestamp.
+    sourceFrame.set_render_time_ms(t0.MillisecondTimestamp());
+    sourceFrame.set_timestamp(t0.MillisecondTimestamp() * 90);
+
     // Test scaling to different sizes: source is of |width|/|height| = 352/288.
     // Scaling mode in VPM is currently fixed to kScaleBox (mode = 3).
     TestSize(sourceFrame, 100, 50, 3, 24.0, _vpm);
@@ -283,7 +296,7 @@ TEST_F(VideoProcessingModuleTest, Resampler)
 
     // stop timer
     t1 = TickTime::Now();
-    accTicks += t1 - t0;
+    accTicks += (t1 - t0);
 
     if (accTicks.Microseconds() < minRuntime || runIdx == 0)  {
       minRuntime = accTicks.Microseconds();
@@ -308,6 +321,11 @@ void TestSize(const I420VideoFrame& source_frame, int target_width,
 
   ASSERT_EQ(VPM_OK, vpm->SetTargetResolution(target_width, target_height, 30));
   ASSERT_EQ(VPM_OK, vpm->PreprocessFrame(source_frame, &out_frame));
+
+  if (out_frame) {
+    EXPECT_EQ(source_frame.render_time_ms(), out_frame->render_time_ms());
+    EXPECT_EQ(source_frame.timestamp(), out_frame->timestamp());
+  }
 
   // If the frame was resampled (scale changed) then:
   // (1) verify the new size and write out processed frame for viewing.

@@ -17,7 +17,8 @@
 #include "modules/rtp_rtcp/interface/rtp_rtcp_defines.h"
 
 namespace webrtc {
-// forward declaration
+// Forward declarations.
+class PacedSender;
 class RemoteBitrateEstimator;
 class RemoteBitrateObserver;
 class Transport;
@@ -36,8 +37,10 @@ class RtpRtcp : public Module {
           rtcp_feedback(NULL),
           intra_frame_callback(NULL),
           bandwidth_callback(NULL),
+          rtt_observer(NULL),
           audio_messages(NULL),
-          remote_bitrate_estimator(NULL) {
+          remote_bitrate_estimator(NULL),
+          paced_sender(NULL) {
     }
    /*  id                   - Unique identifier of this RTP/RTCP module object
     *  audio                - True for a audio version of the RTP/RTCP module
@@ -51,13 +54,15 @@ class RtpRtcp : public Module {
     *  outgoing_transport   - Transport object that will be called when packets
     *                         are ready to be sent out on the network
     *  rtcp_feedback        - Callback object that will receive the incoming
-    *                         RTP messages.
+    *                         RTCP messages.
     *  intra_frame_callback - Called when the receiver request a intra frame.
     *  bandwidth_callback   - Called when we receive a changed estimate from
     *                         the receiver of out stream.
     *  audio_messages       - Telehone events.
     *  remote_bitrate_estimator - Estimates the bandwidth available for a set of
     *                             streams from the same client.
+    *  paced_sender             - Spread any bursts of packets into smaller
+    *                             bursts to minimize packet loss.
     */
     int32_t id;
     bool audio;
@@ -69,8 +74,10 @@ class RtpRtcp : public Module {
     RtcpFeedback* rtcp_feedback;
     RtcpIntraFrameObserver* intra_frame_callback;
     RtcpBandwidthObserver* bandwidth_callback;
+    RtcpRttObserver* rtt_observer;
     RtpAudioFeedback* audio_messages;
     RemoteBitrateEstimator* remote_bitrate_estimator;
+    PacedSender* paced_sender;
   };
   /*
    *   Create a RTP/RTCP module object using the system clock.
@@ -345,13 +352,6 @@ class RtpRtcp : public Module {
     virtual WebRtc_Word32 DeregisterSendRtpHeaderExtension(
         const RTPExtensionType type) = 0;
 
-   /*
-    *   Enable/disable traffic smoothing of sending stream.
-    */
-    virtual void SetTransmissionSmoothingStatus(const bool enable) = 0;
-
-    virtual bool TransmissionSmoothingStatus() const = 0;
-
     /*
     *   get start timestamp
     */
@@ -503,6 +503,9 @@ class RtpRtcp : public Module {
         const RTPFragmentationHeader* fragmentation = NULL,
         const RTPVideoHeader* rtpVideoHdr = NULL) = 0;
 
+    virtual void TimeToSendPacket(uint32_t ssrc, uint16_t sequence_number,
+                                  int64_t capture_time_ms) = 0;
+
     /**************************************************************************
     *
     *   RTCP
@@ -591,6 +594,12 @@ class RtpRtcp : public Module {
     *   return -1 on failure else 0
     */
     virtual WebRtc_Word32 ResetRTT(const WebRtc_UWord32 remoteSSRC)= 0 ;
+
+    /*
+     * Sets the estimated RTT, to be used for receive only modules without
+     * possibility of calculating its own RTT.
+     */
+    virtual void SetRtt(uint32_t rtt) = 0;
 
     /*
     *   Force a send of a RTCP packet

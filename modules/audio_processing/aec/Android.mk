@@ -32,10 +32,12 @@ LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
 
 LOCAL_C_INCLUDES := \
+    $(MY_THIRD_PARTY_PATH) \
     $(LOCAL_PATH)/include \
     $(LOCAL_PATH)/../utility \
     $(LOCAL_PATH)/../../.. \
-    $(LOCAL_PATH)/../../../common_audio/signal_processing/include
+    $(LOCAL_PATH)/../../../common_audio/signal_processing/include \
+    external/webrtc
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

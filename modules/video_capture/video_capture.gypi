@@ -29,9 +29,9 @@
         'include/video_capture_factory.h',
         'video_capture_config.h',
         'video_capture_delay.h',
-        'video_capture_impl.h',
         'video_capture_factory.cc',
         'video_capture_impl.cc',
+        'video_capture_impl.h',
       ],
       'conditions': [
         ['include_internal_video_capture==0', {
@@ -39,32 +39,32 @@
             'external/device_info_external.cc',
             'external/video_capture_external.cc',
           ],
-        },{  # include_internal_video_capture == 1
+        }, {  # include_internal_video_capture == 1
           'conditions': [
             ['OS=="linux"', {
               'include_dirs': [
                 'linux',
               ],
               'sources': [
-                'linux/device_info_linux.h',
-                'linux/video_capture_linux.h',
                 'linux/device_info_linux.cc',
+                'linux/device_info_linux.h',
                 'linux/video_capture_linux.cc',
+                'linux/video_capture_linux.h',
               ],
             }],  # linux
             ['OS=="mac"', {
               'sources': [
-                'mac/qtkit/video_capture_recursive_lock.h',
                 'mac/qtkit/video_capture_qtkit.h',
-                'mac/qtkit/video_capture_qtkit_info.h',
-                'mac/qtkit/video_capture_qtkit_info_objc.h',
-                'mac/qtkit/video_capture_qtkit_objc.h',
-                'mac/qtkit/video_capture_qtkit_utility.h',
                 'mac/qtkit/video_capture_qtkit.mm',
-                'mac/qtkit/video_capture_qtkit_objc.mm',
-                'mac/qtkit/video_capture_recursive_lock.mm',
+                'mac/qtkit/video_capture_qtkit_info.h',
                 'mac/qtkit/video_capture_qtkit_info.mm',
+                'mac/qtkit/video_capture_qtkit_info_objc.h',
                 'mac/qtkit/video_capture_qtkit_info_objc.mm',
+                'mac/qtkit/video_capture_qtkit_objc.h',
+                'mac/qtkit/video_capture_qtkit_objc.mm',
+                'mac/qtkit/video_capture_qtkit_utility.h',
+                'mac/qtkit/video_capture_recursive_lock.h',
+                'mac/qtkit/video_capture_recursive_lock.mm',
                 'mac/video_capture_mac.mm',
               ],
               'include_dirs': [
@@ -80,22 +80,25 @@
             }],  # mac
             ['OS=="win"', {
               'dependencies': [
-                '<(webrtc_root)/modules/video_capture/windows/direct_show_base_classes.gyp:direct_show_base_classes',
+                '<(DEPTH)/third_party/winsdk_samples/winsdk_samples.gyp:directshow_baseclasses',
               ],
               'include_dirs': [
                 'windows',
               ],
               'sources': [
-                'windows/help_functions_windows.h',
-                'windows/sink_filter_windows.h',
-                'windows/video_capture_windows.h',
-                'windows/device_info_windows.h',
-                'windows/capture_delay_values_windows.h',
-                'windows/help_functions_windows.cc',
-                'windows/sink_filter_windows.cc',
-                'windows/video_capture_windows.cc',
-                'windows/device_info_windows.cc',
+                'windows/device_info_ds.cc',
+                'windows/device_info_ds.h',
+                'windows/device_info_mf.cc',
+                'windows/device_info_mf.h',
+                'windows/help_functions_ds.cc',
+                'windows/help_functions_ds.h',
+                'windows/sink_filter_ds.cc',
+                'windows/sink_filter_ds.h',
+                'windows/video_capture_ds.cc',
+                'windows/video_capture_ds.h',
                 'windows/video_capture_factory_windows.cc',
+                'windows/video_capture_mf.cc',
+                'windows/video_capture_mf.h',
               ],
               'link_settings': {
                 'libraries': [

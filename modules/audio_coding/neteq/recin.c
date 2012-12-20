@@ -35,13 +35,15 @@ int WebRtcNetEQ_RecInInternal(MCUInst_t *MCU_inst, RTPPacket_t *RTPpacketInput,
     WebRtc_Word16 codecPos;
     int curr_Codec;
     WebRtc_Word16 isREDPayload = 0;
-    WebRtc_Word32 temp_bufsize = MCU_inst->PacketBuffer_inst.numPacketsInBuffer;
+    WebRtc_Word32 temp_bufsize;
 #ifdef NETEQ_RED_CODEC
     RTPPacket_t* RTPpacketPtr[2]; /* Support for redundancy up to 2 payloads */
     RTPpacketPtr[0] = &RTPpacket[0];
     RTPpacketPtr[1] = &RTPpacket[1];
 #endif
 
+    temp_bufsize = WebRtcNetEQ_PacketBufferGetSize(&MCU_inst->PacketBuffer_inst,
+                                                   &MCU_inst->codec_DB_inst);
     /*
      * Copy from input RTP packet to local copy
      * (mainly to enable multiple payloads using RED)
@@ -308,8 +310,9 @@ int WebRtcNetEQ_RecInInternal(MCUInst_t *MCU_inst, RTPPacket_t *RTPpacketInput,
     if (MCU_inst->BufferStat_inst.Automode_inst.lastPackCNGorDTMF == 0)
     {
         /* Calculate the total speech length carried in each packet */
-        temp_bufsize = MCU_inst->PacketBuffer_inst.numPacketsInBuffer - temp_bufsize;
-        temp_bufsize *= MCU_inst->PacketBuffer_inst.packSizeSamples;
+        temp_bufsize = WebRtcNetEQ_PacketBufferGetSize(
+            &MCU_inst->PacketBuffer_inst, &MCU_inst->codec_DB_inst)
+            - temp_bufsize;
 
         if ((temp_bufsize > 0) && (MCU_inst->BufferStat_inst.Automode_inst.lastPackCNGorDTMF
             == 0) && (temp_bufsize
@@ -377,11 +380,12 @@ int WebRtcNetEQ_GetTimestampScaling(MCUInst_t *MCU_inst, int rtpPayloadType)
             MCU_inst->scalingFactor = kTSscalingTwo;
             break;
         }
+        case kDecoderISACfb:
         case kDecoderOpus:
         {
-            /* We resample Opus internally to 32 kHz, but timestamps
-             * are counted at 48 kHz. So there are two output samples
-             * per three RTP timestamp ticks. */
+            /* We resample Opus internally to 32 kHz, and isac-fb decodes at
+             * 32 kHz, but timestamps are counted at 48 kHz. So there are two
+             * output samples per three RTP timestamp ticks. */
             MCU_inst->scalingFactor = kTSscalingTwoThirds;
             break;
         }

@@ -32,6 +32,7 @@ LOCAL_CFLAGS := \
     # '-DWEBRTC_MODULE_UTILITY_VIDEO'
 
 LOCAL_C_INCLUDES := \
+    $(MY_THIRD_PARTY_PATH) \
     $(LOCAL_PATH)/../interface \
     $(LOCAL_PATH)/../../interface \
     $(LOCAL_PATH)/../../audio_coding/main/interface \
@@ -41,7 +42,8 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../../.. \
     $(LOCAL_PATH)/../../../common_video/vplib/main/interface \
     $(LOCAL_PATH)/../../../common_audio/resampler/include \
-    $(LOCAL_PATH)/../../../system_wrappers/interface 
+    $(LOCAL_PATH)/../../../system_wrappers/interface \
+    external/webrtc
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

@@ -67,6 +67,7 @@
         'include/vie_rtp_rtcp.h',
 
         # headers
+        'call_stats.h',
         'encoder_state_feedback.h',
         'stream_synchronization.h',
         'vie_base_impl.h',
@@ -95,7 +96,6 @@
         'vie_frame_provider_base.h',
         'vie_input_manager.h',
         'vie_manager_base.h',
-        'vie_performance_monitor.h',
         'vie_receiver.h',
         'vie_renderer.h',
         'vie_render_manager.h',
@@ -103,6 +103,7 @@
         'vie_sync_module.h',
 
         # ViE
+        'call_stats.cc',
         'encoder_state_feedback.cc',
         'stream_synchronization.cc',
         'vie_base_impl.cc',
@@ -129,7 +130,6 @@
         'vie_frame_provider_base.cc',
         'vie_input_manager.cc',
         'vie_manager_base.cc',
-        'vie_performance_monitor.cc',
         'vie_receiver.cc',
         'vie_remb.cc',
         'vie_renderer.cc',
@@ -157,6 +157,7 @@
             '../modules/rtp_rtcp/interface',
           ],
           'sources': [
+            'call_stats_unittest.cc',
             'encoder_state_feedback_unittest.cc',
             'stream_synchronization_unittest.cc',
             'vie_remb_unittest.cc',

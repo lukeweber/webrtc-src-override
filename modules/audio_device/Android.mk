@@ -34,6 +34,7 @@ LOCAL_CFLAGS := \
 
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH) \
+    $(MY_THIRD_PARTY_PATH) \
     $(LOCAL_PATH)/android \
     $(LOCAL_PATH)/dummy \
     $(LOCAL_PATH)/linux \

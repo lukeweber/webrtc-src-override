@@ -36,17 +36,19 @@ void FindCaptureDeviceOnSystem(webrtc::ViECapture* capture,
     *device_video = webrtc::VideoCaptureFactory::Create(4571, unique_id);
     EXPECT_TRUE(*device_video != NULL);
 
-    (*device_video)->AddRef();
+    if (*device_video) {
+      (*device_video)->AddRef();
 
-    int error = capture->AllocateCaptureDevice(**device_video, *device_id);
-    if (error == 0) {
-      ViETest::Log("Using capture device: %s, captureId: %d.",
-                   device_name, *device_id);
-      capture_device_set = true;
-      break;
-    } else {
-      (*device_video)->Release();
-      (*device_video) = NULL;
+      int error = capture->AllocateCaptureDevice(**device_video, *device_id);
+      if (error == 0) {
+        ViETest::Log("Using capture device: %s, captureId: %d.",
+                     device_name, *device_id);
+        capture_device_set = true;
+        break;
+      } else {
+        (*device_video)->Release();
+        (*device_video) = NULL;
+      }
     }
   }
   delete dev_info;
@@ -71,22 +73,27 @@ void RenderToFile(webrtc::ViERender* renderer_interface,
   EXPECT_EQ(0, renderer_interface->StartRender(frame_provider_id));
 }
 
-void StopAndRemoveRenderers(webrtc::ViEBase* base_interface,
-                            webrtc::ViERender* render_interface,
-                            int channel_id,
-                            int capture_id) {
-  EXPECT_EQ(0, render_interface->StopRender(channel_id));
-  EXPECT_EQ(0, render_interface->RemoveRenderer(channel_id));
-  EXPECT_EQ(0, render_interface->RemoveRenderer(capture_id));
-}
-
 void ConfigureRtpRtcp(webrtc::ViERTP_RTCP* rtcp_interface,
+                      ProtectionMethod protection_method,
                       int video_channel) {
   EXPECT_EQ(0, rtcp_interface->SetRTCPStatus(video_channel,
                                              webrtc::kRtcpCompound_RFC4585));
   EXPECT_EQ(0, rtcp_interface->SetKeyFrameRequestMethod(
       video_channel, webrtc::kViEKeyFrameRequestPliRtcp));
   EXPECT_EQ(0, rtcp_interface->SetTMMBRStatus(video_channel, true));
+  switch (protection_method) {
+    case kNack:
+      EXPECT_EQ(0, rtcp_interface->SetNACKStatus(video_channel, true));
+      break;
+    case kHybridNackFec:
+      const int kRedPayloadType = 96;
+      const int kUlpFecPayloadType = 97;
+      EXPECT_EQ(0, rtcp_interface->SetHybridNACKFECStatus(video_channel,
+                                                          true,
+                                                          kRedPayloadType,
+                                                          kUlpFecPayloadType));
+      break;
+  }
 }
 
 bool FindSpecificCodec(webrtc::VideoCodecType of_type,

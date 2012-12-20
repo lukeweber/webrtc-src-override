@@ -216,7 +216,8 @@ WebRtc_Word32 VideoCaptureImpl::DeliverCapturedFrame(I420VideoFrame&
 }
 
 WebRtc_Word32 VideoCaptureImpl::DeliverEncodedCapturedFrame(
-    VideoFrame& captureFrame, WebRtc_Word64 capture_time) {
+    VideoFrame& captureFrame, WebRtc_Word64 capture_time,
+    VideoCodecType codecType) {
   UpdateFrameCount();  // frame count used for local frame rate callback.
 
   const bool callOnCaptureDelayChanged = _setCaptureDelay != _captureDelay;
@@ -243,7 +244,7 @@ WebRtc_Word32 VideoCaptureImpl::DeliverEncodedCapturedFrame(
     if (callOnCaptureDelayChanged) {
       _dataCallBack->OnCaptureDelayChanged(_id, _captureDelay);
     }
-    _dataCallBack->OnIncomingCapturedEncodedFrame(_id, captureFrame);
+    _dataCallBack->OnIncomingCapturedEncodedFrame(_id, captureFrame, codecType);
   }
 
   return 0;
@@ -281,13 +282,22 @@ WebRtc_Word32 VideoCaptureImpl::IncomingFrame(
             return -1;
         }
 
+        int stride_y = width;
+        int stride_uv = (width + 1) / 2;
+        int target_width = width;
+        int target_height = height;
+        // Rotating resolution when for 90/270 degree rotations.
+        if (_rotateFrame == kRotate90 || _rotateFrame == kRotate270)  {
+          target_width = abs(height);
+          target_height = width;
+        }
+        // TODO(mikhal): Update correct aligned stride values.
+        //Calc16ByteAlignedStride(target_width, &stride_y, &stride_uv);
         // Setting absolute height (in case it was negative).
         // In Windows, the image starts bottom left, instead of top left.
         // Setting a negative source height, inverts the image (within LibYuv).
-        int stride_y = 0;
-        int stride_uv = 0;
-        Calc16ByteAlignedStride(width, &stride_y, &stride_uv);
-        int ret = _captureFrame.CreateEmptyFrame(width, abs(height),
+        int ret = _captureFrame.CreateEmptyFrame(target_width,
+                                                 abs(target_height),
                                                  stride_y,
                                                  stride_uv, stride_uv);
         if (ret < 0)
@@ -320,7 +330,8 @@ WebRtc_Word32 VideoCaptureImpl::IncomingFrame(
                        "Failed to copy captured frame of length %d",
                        static_cast<int>(videoFrameLength));
         }
-        DeliverEncodedCapturedFrame(_capture_encoded_frame, captureTime);
+        DeliverEncodedCapturedFrame(_capture_encoded_frame, captureTime,
+                                    frameInfo.codecType);
     }
 
     const WebRtc_UWord32 processTime =
@@ -340,8 +351,8 @@ WebRtc_Word32 VideoCaptureImpl::IncomingFrameI420(
 
   CriticalSectionScoped cs(&_callBackCs);
   int size_y = video_frame.height * video_frame.y_pitch;
-  int size_u = video_frame.u_pitch * (video_frame.height + 1) / 2;
-  int size_v =  video_frame.v_pitch * (video_frame.height + 1) / 2;
+  int size_u = video_frame.u_pitch * ((video_frame.height + 1) / 2);
+  int size_v =  video_frame.v_pitch * ((video_frame.height + 1) / 2);
   // TODO(mikhal): Can we use Swap here? This will do a memcpy.
   int ret = _captureFrame.CreateFrame(size_y, video_frame.y_plane,
                                       size_u, video_frame.u_plane,
@@ -360,26 +371,25 @@ WebRtc_Word32 VideoCaptureImpl::IncomingFrameI420(
   return 0;
 }
 
-WebRtc_Word32 VideoCaptureImpl::SetCaptureRotation(VideoCaptureRotation rotation)
-{
-    CriticalSectionScoped cs(&_apiCs);
-    CriticalSectionScoped cs2(&_callBackCs);
-    switch (rotation)
-    {
-        case kCameraRotate0:
-            _rotateFrame = kRotateNone;
-            break;
-        case kCameraRotate90:
-            _rotateFrame = kRotate90;
-            break;
-        case kCameraRotate180:
-            _rotateFrame = kRotate180;
-            break;
-        case kCameraRotate270:
-            _rotateFrame = kRotate270;
-            break;
-    }
-    return 0;
+WebRtc_Word32 VideoCaptureImpl::SetCaptureRotation(VideoCaptureRotation
+                                                   rotation) {
+  CriticalSectionScoped cs(&_apiCs);
+  CriticalSectionScoped cs2(&_callBackCs);
+  switch (rotation){
+    case kCameraRotate0:
+      _rotateFrame = kRotateNone;
+      break;
+    case kCameraRotate90:
+      _rotateFrame = kRotate90;
+      break;
+    case kCameraRotate180:
+      _rotateFrame = kRotate180;
+      break;
+    case kCameraRotate270:
+      _rotateFrame = kRotate270;
+      break;
+  }
+  return 0;
 }
 
 WebRtc_Word32 VideoCaptureImpl::EnableFrameRateCallback(const bool enable)

@@ -48,7 +48,7 @@ LOCAL_SRC_FILES := \
     rtp_receiver_video.cc \
     rtp_sender_video.cc \
     rtp_format_vp8.cc \
-    transmission_bucket.cc \
+    rtp_receiver_strategy.cc \
     vp8_partition_aggregator.cc
 
 # Flags passed to both C and C++ files.
@@ -56,6 +56,8 @@ LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
 
 LOCAL_C_INCLUDES := \
+    $(MY_THIRD_PARTY_PATH) \
+    $(MY_WEBRTC_PATH)/modules/pacing/include \
     $(LOCAL_PATH)/../interface \
     $(LOCAL_PATH)/../../.. \
     $(LOCAL_PATH)/../../interface \

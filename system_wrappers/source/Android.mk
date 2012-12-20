@@ -29,6 +29,7 @@ LOCAL_SRC_FILES := \
     cpu_info.cc \
     critical_section.cc \
     event.cc \
+    event_tracer.cc \
     file_impl.cc \
     list_no_stl.cc \
     rw_lock.cc \
@@ -40,6 +41,7 @@ LOCAL_SRC_FILES := \
     sleep.cc \
     thread_posix.cc \
     rw_lock_posix.cc \
+    tick_util.cc \
     ../../../../client/threadpriorityhandler.cc
 
 ifeq ($(ENABLE_WEBRTC_TRACE), 1)
@@ -56,11 +58,13 @@ LOCAL_CFLAGS := \
 
 LOCAL_C_INCLUDES := \
     $(MY_ROOT_PATH) \
+    $(MY_THIRD_PARTY_PATH) \
     $(LOCAL_PATH)/../.. \
-    $(LOCAL_PATH)/../../../../ \
+    $(LOCAL_PATH)/../../../.. \
     $(LOCAL_PATH)/../../../../app/jni \
     $(LOCAL_PATH)/../interface \
-    $(LOCAL_PATH)/spreadsortlib
+    $(LOCAL_PATH)/spreadsortlib \
+    external/webrtc
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

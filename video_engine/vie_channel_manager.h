@@ -28,9 +28,9 @@ namespace webrtc {
 class CriticalSectionWrapper;
 class MapWrapper;
 class ProcessThread;
+class RtcpRttObserver;
 class ViEChannel;
 class ViEEncoder;
-class ViEPerformanceMonitor;
 class VoEVideoSync;
 class VoiceEngine;
 
@@ -44,7 +44,6 @@ class ViEChannelManager: private ViEManagerBase {
  public:
   ViEChannelManager(int engine_id,
                     int number_of_cores,
-                    ViEPerformanceMonitor* vie_performance_monitor,
                     const OverUseDetectorOptions& options);
   ~ViEChannelManager();
 
@@ -86,9 +85,11 @@ class ViEChannelManager: private ViEManagerBase {
  private:
   // Creates a channel object connected to |vie_encoder|. Assumed to be called
   // protected.
-  bool CreateChannelObject(int channel_id, ViEEncoder* vie_encoder,
+  bool CreateChannelObject(int channel_id,
+                           ViEEncoder* vie_encoder,
                            RtcpBandwidthObserver* bandwidth_observer,
                            RemoteBitrateEstimator* remote_bitrate_estimator,
+                           RtcpRttObserver* rtcp_rtt_observer,
                            RtcpIntraFrameObserver* intra_frame_observer,
                            bool sender);
 
