@@ -54,7 +54,9 @@ LOCAL_SRC_FILES := \
 # Flags passed to both C and C++ files.
 LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS) \
-    '-DNETEQ_VOICEENGINE_CODECS'
+	'-DNETEQ_VOICEENGINE_CODECS' \
+	'-DSCRATCH'
+
 
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/interface \
