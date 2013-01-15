@@ -57,13 +57,13 @@ LOCAL_CFLAGS := \
 
 LOCAL_C_INCLUDES := \
     $(MY_THIRD_PARTY_PATH) \
+    $(MY_WEBRTC_PATH) \
     $(MY_WEBRTC_PATH)/modules/pacing/include \
-    $(LOCAL_PATH)/../interface \
-    $(LOCAL_PATH)/../../.. \
-    $(LOCAL_PATH)/../../interface \
-    $(LOCAL_PATH)/../../../system_wrappers/interface \
-    $(LOCAL_PATH)/../../remote_bitrate_estimator \
-    $(LOCAL_PATH)/../../remote_bitrate_estimator/include
+    $(MY_WEBRTC_PATH)/modules/rtp_rtcp/interface \
+    $(MY_WEBRTC_PATH)/modules/interface \
+    $(MY_WEBRTC_PATH)/modules/remote_bitrate_estimator \
+    $(MY_WEBRTC_PATH)/modules/remote_bitrate_estimator/include \
+    $(MY_WEBRTC_PATH)/system_wrappers/interface
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

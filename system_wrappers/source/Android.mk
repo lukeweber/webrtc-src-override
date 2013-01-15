@@ -45,26 +45,23 @@ LOCAL_SRC_FILES := \
     ../../../../client/threadpriorityhandler.cc
 
 ifeq ($(ENABLE_WEBRTC_TRACE), 1)
-	LOCAL_SRC_FILES += \
-		trace_impl.cc \
-		trace_posix.cc
+  LOCAL_SRC_FILES += \
+    trace_impl.cc \
+    trace_posix.cc
 else
-	LOCAL_SRC_FILES += \
-		trace_impl_no_op.cc
+  LOCAL_SRC_FILES += \
+    trace_impl_no_op.cc
 endif
 
 LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
 
 LOCAL_C_INCLUDES := \
-    $(MY_ROOT_PATH) \
+    $(MY_CLIENT_PATH)/.. \
     $(MY_THIRD_PARTY_PATH) \
-    $(LOCAL_PATH)/../.. \
-    $(LOCAL_PATH)/../../../.. \
-    $(LOCAL_PATH)/../../../../app/jni \
-    $(LOCAL_PATH)/../interface \
-    $(LOCAL_PATH)/spreadsortlib \
-    external/webrtc
+    $(MY_WEBRTC_PATH) \
+    $(MY_WEBRTC_PATH)/system_wrappers/interface \
+    $(LOCAL_PATH)/spreadsortlib
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

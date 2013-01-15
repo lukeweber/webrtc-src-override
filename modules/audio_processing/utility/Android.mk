@@ -28,10 +28,9 @@ LOCAL_CFLAGS := \
 
 # Include paths placed before CFLAGS/CPPFLAGS
 LOCAL_C_INCLUDES := \
-    $(LOCAL_PATH) \
-    $(LOCAL_PATH)/../../.. \
-    $(LOCAL_PATH)/../../../common_audio/signal_processing/include \
-    external/webrtc
+    $(MY_THIRD_PARTY_PATH) \
+    $(MY_WEBRTC_PATH) \
+    $(MY_WEBRTC_PATH)/common_audio/signal_processing/include
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

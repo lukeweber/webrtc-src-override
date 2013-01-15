@@ -30,20 +30,17 @@ LOCAL_SRC_FILES := \
 LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
 
-    # -DWEBRTC_ANDROID_OPENSLES
-
 LOCAL_C_INCLUDES := \
-    $(LOCAL_PATH) \
     $(MY_THIRD_PARTY_PATH) \
+    $(MY_WEBRTC_PATH) \
+    $(MY_WEBRTC_PATH)/modules/interface \
+    $(MY_WEBRTC_PATH)/common_audio/resampler/include \
+    $(MY_WEBRTC_PATH)/common_audio/signal_processing/include \
+    $(MY_WEBRTC_PATH)/system_wrappers/interface \
     $(LOCAL_PATH)/android \
     $(LOCAL_PATH)/dummy \
     $(LOCAL_PATH)/linux \
-    $(LOCAL_PATH)/include \
-    $(LOCAL_PATH)/../interface \
-    $(LOCAL_PATH)/../.. \
-    $(LOCAL_PATH)/../../common_audio/resampler/include \
-    $(LOCAL_PATH)/../../common_audio/signal_processing/include \
-    $(LOCAL_PATH)/../../system_wrappers/interface
+    $(LOCAL_PATH)/include
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

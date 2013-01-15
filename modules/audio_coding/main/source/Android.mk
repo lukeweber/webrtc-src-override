@@ -41,21 +41,21 @@ LOCAL_CFLAGS := \
 
 LOCAL_C_INCLUDES := \
     $(MY_THIRD_PARTY_PATH) \
-    $(LOCAL_PATH)/../interface \
-    $(LOCAL_PATH)/../../codecs/cng/include \
-    $(LOCAL_PATH)/../../codecs/g711/include \
-    $(LOCAL_PATH)/../../codecs/g722/include \
-    $(LOCAL_PATH)/../../codecs/ilbc/interface \
-    $(LOCAL_PATH)/../../codecs/isac/main/interface \
-    $(LOCAL_PATH)/../../codecs/isac/fix/interface \
-    $(LOCAL_PATH)/../../codecs/pcm16b/include \
-    $(LOCAL_PATH)/../../neteq/interface \
-    $(LOCAL_PATH)/../../../.. \
-    $(LOCAL_PATH)/../../../interface \
-    $(LOCAL_PATH)/../../../../common_audio/resampler/include \
-    $(LOCAL_PATH)/../../../../common_audio/signal_processing/include \
-    $(LOCAL_PATH)/../../../../common_audio/vad/include \
-    $(LOCAL_PATH)/../../../../system_wrappers/interface 
+    $(MY_WEBRTC_PATH) \
+    $(MY_WEBRTC_PATH)/modules/audio_coding/main/interface \
+    $(MY_WEBRTC_PATH)/modules/audio_coding/codecs/cng/include \
+    $(MY_WEBRTC_PATH)/modules/audio_coding/codecs/g711/include \
+    $(MY_WEBRTC_PATH)/modules/audio_coding/codecs/g722/include \
+    $(MY_WEBRTC_PATH)/modules/audio_coding/codecs/ilbc/interface \
+    $(MY_WEBRTC_PATH)/modules/audio_coding/codecs/isac/main/interface \
+    $(MY_WEBRTC_PATH)/modules/audio_coding/codecs/isac/fix/interface \
+    $(MY_WEBRTC_PATH)/modules/audio_coding/codecs/pcm16b/include \
+    $(MY_WEBRTC_PATH)/modules/audio_coding/neteq/interface \
+    $(MY_WEBRTC_PATH)/modules/interface \
+    $(MY_WEBRTC_PATH)/common_audio/resampler/include \
+    $(MY_WEBRTC_PATH)/common_audio/signal_processing/include \
+    $(MY_WEBRTC_PATH)/common_audio/vad/include \
+    $(MY_WEBRTC_PATH)/system_wrappers/interface
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

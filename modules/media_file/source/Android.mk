@@ -29,12 +29,12 @@ LOCAL_CFLAGS := \
 
 LOCAL_C_INCLUDES := \
     $(MY_THIRD_PARTY_PATH) \
-    $(LOCAL_PATH)/../interface \
-    $(LOCAL_PATH)/../../.. \
-    $(LOCAL_PATH)/../../interface \
-    $(LOCAL_PATH)/../../utility/interface \
-    $(LOCAL_PATH)/../../audio_coding/main/interface \
-    $(LOCAL_PATH)/../../../system_wrappers/interface 
+    $(MY_WEBRTC_PATH) \
+    $(MY_WEBRTC_PATH)/modules/interface \
+    $(MY_WEBRTC_PATH)/modules/utility/interface \
+    $(MY_WEBRTC_PATH)/audio_coding/main/interface \
+    $(MY_WEBRTC_PATH)/system_wrappers/interface \
+    $(MY_WEBRTC_PATH)/modules/media_file/interface
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

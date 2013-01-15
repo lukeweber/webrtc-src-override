@@ -28,10 +28,9 @@ LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
 
 LOCAL_C_INCLUDES := \
-    $(LOCAL_PATH)/include \
-    $(LOCAL_PATH)/../.. \
-    $(LOCAL_PATH)/../signal_processing/include \
-    external/webrtc
+    $(MY_WEBRTC_PATH) \
+    $(MY_WEBRTC_PATH)/common_audio/signal_processing/include \
+    $(LOCAL_PATH)/include
 
 LOCAL_SHARED_LIBRARIES := \
     libdl \

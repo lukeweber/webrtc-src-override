@@ -25,11 +25,14 @@ LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
 
 LOCAL_C_INCLUDES := \
-    $(LOCAL_PATH)/include \
-    $(LOCAL_PATH)/../../ \
-    $(LOCAL_PATH)/../interface \
-    $(LOCAL_PATH)/../../../../ \
-    external/jpeg
+    $(MY_THIRD_PARTY_PATH) \
+    $(MY_WEBRTC_PATH) \
+    $(LOCAL_PATH)/include
+
+    # $(LOCAL_PATH)/../../ \
+    # $(LOCAL_PATH)/../interface \
+    # $(LOCAL_PATH)/../../../../ \
+    # external/jpeg
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

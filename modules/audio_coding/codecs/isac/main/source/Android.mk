@@ -51,9 +51,9 @@ LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
 
 LOCAL_C_INCLUDES := \
-    $(LOCAL_PATH)/../interface \
-    $(LOCAL_PATH)/../../../../../.. \
-    $(LOCAL_PATH)/../../../../../../common_audio/signal_processing/include 
+    $(MY_WEBRTC_PATH) \
+    $(MY_WEBRTC_PATH)/common_audio/signal_processing/include \
+    $(MY_WEBRTC_PATH)/modules/audio_coding/codecs/isac/fix/interface
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

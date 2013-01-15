@@ -41,18 +41,16 @@ LOCAL_CFLAGS := \
 
 LOCAL_C_INCLUDES := \
     $(MY_THIRD_PARTY_PATH) \
-    $(LOCAL_PATH)/include \
+    $(MY_WEBRTC_PATH) \
+    $(MY_WEBRTC_PATH)/modules/interface \
+    $(MY_WEBRTC_PATH)/common_audio/signal_processing/include \
+    $(MY_WEBRTC_PATH)/common_audio/vad/include \
+    $(MY_WEBRTC_PATH)/system_wrappers/interface \
     $(LOCAL_PATH)/aec/include \
     $(LOCAL_PATH)/aecm/include \
     $(LOCAL_PATH)/agc/include \
     $(LOCAL_PATH)/ns/include \
-    $(LOCAL_PATH)/../interface \
-    $(LOCAL_PATH)/../.. \
-    $(LOCAL_PATH)/../../common_audio/signal_processing/include \
-    $(LOCAL_PATH)/../../common_audio/vad/include \
-    $(LOCAL_PATH)/../../system_wrappers/interface \
-    external/protobuf/src \
-    external/webrtc
+    $(LOCAL_PATH)/include
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

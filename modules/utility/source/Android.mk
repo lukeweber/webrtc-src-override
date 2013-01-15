@@ -33,17 +33,16 @@ LOCAL_CFLAGS := \
 
 LOCAL_C_INCLUDES := \
     $(MY_THIRD_PARTY_PATH) \
-    $(LOCAL_PATH)/../interface \
-    $(LOCAL_PATH)/../../interface \
-    $(LOCAL_PATH)/../../audio_coding/main/interface \
-    $(LOCAL_PATH)/../../media_file/interface \
-    $(LOCAL_PATH)/../../video_coding/main/interface \
-    $(LOCAL_PATH)/../../video_coding/codecs/interface \
-    $(LOCAL_PATH)/../../.. \
-    $(LOCAL_PATH)/../../../common_video/vplib/main/interface \
-    $(LOCAL_PATH)/../../../common_audio/resampler/include \
-    $(LOCAL_PATH)/../../../system_wrappers/interface \
-    external/webrtc
+    $(MY_WEBRTC_PATH) \
+    $(MY_WEBRTC_PATH)/modules/utility/interface \
+    $(MY_WEBRTC_PATH)/modules/interface \
+    $(MY_WEBRTC_PATH)/modules/audio_coding/main/interface \
+    $(MY_WEBRTC_PATH)/modules/media_file/interface \
+    $(MY_WEBRTC_PATH)/modules/video_coding/main/interface \
+    $(MY_WEBRTC_PATH)/modules/video_coding/codecs/interface \
+    $(MY_WEBRTC_PATH)/common_video/vplib/main/interface \
+    $(MY_WEBRTC_PATH)/common_audio/resampler/include \
+    $(MY_WEBRTC_PATH)/system_wrappers/interface
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

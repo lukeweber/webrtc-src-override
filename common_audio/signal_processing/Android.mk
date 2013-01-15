@@ -55,9 +55,8 @@ LOCAL_CFLAGS := \
 
 LOCAL_C_INCLUDES := \
     $(MY_THIRD_PARTY_PATH) \
-    $(LOCAL_PATH)/include \
-    $(LOCAL_PATH)/../.. \
-    external/webrtc
+    $(MY_WEBRTC_PATH) \
+    $(LOCAL_PATH)/include
 
 ifeq ($(ARCH_ARM_HAVE_ARMV7A),true)
 LOCAL_SRC_FILES += \
@@ -114,9 +113,9 @@ LOCAL_CFLAGS := \
     $(MY_ARM_CFLAGS_NEON)
 
 LOCAL_C_INCLUDES := \
-    $(LOCAL_PATH)/include \
-    $(LOCAL_PATH)/../.. \
-    external/webrtc
+    $(MY_THIRD_PARTY_PATH) \
+    $(MY_WEBRTC_PATH) \
+    $(LOCAL_PATH)/include
 
 ifndef NDK_ROOT
 include external/stlport/libstlport.mk

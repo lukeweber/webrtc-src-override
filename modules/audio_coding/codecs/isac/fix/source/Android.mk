@@ -62,9 +62,9 @@ LOCAL_CFLAGS := \
 
 LOCAL_C_INCLUDES := \
     $(MY_THIRD_PARTY_PATH) \
-    $(LOCAL_PATH)/../interface \
-    $(LOCAL_PATH)/../../../../../.. \
-    $(LOCAL_PATH)/../../../../../../common_audio/signal_processing/include
+    $(MY_WEBRTC_PATH) \
+    $(MY_WEBRTC_PATH)/common_audio/signal_processing/include \
+    $(MY_WEBRTC_PATH)/modules/audio_coding/codecs/isac/fix/interface
 
 LOCAL_STATIC_LIBRARIES += libwebrtc_system_wrappers
 
@@ -104,9 +104,9 @@ LOCAL_CFLAGS := \
 
 LOCAL_C_INCLUDES := \
     $(MY_THIRD_PARTY_PATH) \
-    $(LOCAL_PATH)/../interface \
-    $(LOCAL_PATH)/../../../../../.. \
-    $(LOCAL_PATH)/../../../../../../common_audio/signal_processing/include
+    $(MY_WEBRTC_PATH) \
+    $(MY_WEBRTC_PATH)/common_audio/signal_processing/include \
+    $(MY_WEBRTC_PATH)/modules/audio_coding/codecs/isac/fix/interface
 
 
 ifndef NDK_ROOT

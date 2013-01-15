@@ -29,12 +29,12 @@ LOCAL_SRC_FILES := \
 LOCAL_CFLAGS := $(MY_WEBRTC_COMMON_DEFS)
 
 LOCAL_C_INCLUDES := \
-    $(LOCAL_PATH)/include \
-    $(LOCAL_PATH)/../utility \
-    $(LOCAL_PATH)/../../.. \
-    $(LOCAL_PATH)/../../../common_audio/signal_processing/include \
-    $(LOCAL_PATH)/../../../system_wrappers/interface \
-    external/webrtc
+    $(MY_THIRD_PARTY_PATH) \
+    $(MY_WEBRTC_PATH) \
+    $(MY_WEBRTC_PATH)/modules/audio_processing/utility \
+    $(MY_WEBRTC_PATH)/common_audio/signal_processing/include \
+    $(MY_WEBRTC_PATH)/system_wrappers/interface \
+    $(LOCAL_PATH)/include
 
 LOCAL_STATIC_LIBRARIES += libwebrtc_system_wrappers
 
@@ -81,10 +81,10 @@ LOCAL_CFLAGS := \
 
 LOCAL_C_INCLUDES := \
     $(NS_ASM_HEADER_DIR) \
-    $(LOCAL_PATH)/include \
-    $(LOCAL_PATH)/../../.. \
-    $(LOCAL_PATH)/../../../common_audio/signal_processing/include \
-    external/webrtc
+    $(MY_WEBRTC_PATH) \
+    $(MY_THIRD_PARTY_PATH) \
+    $(MY_WEBRTC_PATH)/common_audio/signal_processing/include \
+    $(LOCAL_PATH)/include
 
 LOCAL_INCLUDES := $(LOCAL_C_INCLUDES)
 
