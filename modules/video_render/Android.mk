@@ -32,6 +32,10 @@ LOCAL_CFLAGS := \
     '-DWEBRTC_INCLUDE_INTERNAL_VIDEO_RENDER'
 
 LOCAL_C_INCLUDES := \
+    $(MY_THIRD_PARTY_PATH) \
+    $(MY_WEBRTC_PATH) \
+    $(MY_WEBRTC_PATH)/modules/video_render/include \
+    $(MY_WEBRTC_PATH)/system_wrappers/interface/\
     $(LOCAL_PATH) \
     $(LOCAL_PATH)/android \
     $(LOCAL_PATH)/../interface \
@@ -40,7 +44,7 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../../../interface \
     $(LOCAL_PATH)/../../../utility/interface \
     $(LOCAL_PATH)/../../../../common_video/vplib/main/interface \
-    $(LOCAL_PATH)/../../../../system_wrappers/interface 
+    $(LOCAL_PATH)/../../../../system_wrappers/interface
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

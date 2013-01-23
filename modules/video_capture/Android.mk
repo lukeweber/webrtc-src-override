@@ -29,6 +29,10 @@ LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
 
 LOCAL_C_INCLUDES := \
+    $(MY_THIRD_PARTY_PATH) \
+    $(MY_WEBRTC_PATH) \
+    $(MY_WEBRTC_PATH)/modules/video_capture/include \
+    $(MY_WEBRTC_PATH)/system_wrappers/interface/\
     $(LOCAL_PATH)/android \
     $(LOCAL_PATH)/../interface \
     $(LOCAL_PATH)/../source \

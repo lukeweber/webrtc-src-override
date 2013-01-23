@@ -26,6 +26,8 @@ LOCAL_CFLAGS := \
 
 LOCAL_C_INCLUDES := \
     $(MY_THIRD_PARTY_PATH) \
+    $(MY_THIRD_PARTY_PATH)/libyuv/include \
+    $(MY_THIRD_PARTY_PATH)/libjpeg_turbo \
     $(MY_WEBRTC_PATH) \
     $(LOCAL_PATH)/include
 

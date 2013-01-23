@@ -24,6 +24,7 @@ LOCAL_CFLAGS := \
 
 # Include paths placed before CFLAGS/CPPFLAGS
 LOCAL_C_INCLUDES := \
+    $(MY_THIRD_PARTY_PATH) \
     $(LOCAL_PATH)/../interface \
     $(LOCAL_PATH)/../../../interface \
     $(LOCAL_PATH)/../../../../../.. \

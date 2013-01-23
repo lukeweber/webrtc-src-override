@@ -39,6 +39,7 @@ LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
 
 LOCAL_C_INCLUDES := \
+    $(MY_THIRD_PARTY_PATH) \
     $(LOCAL_PATH)/../interface \
     $(LOCAL_PATH)/../../../.. \
     $(LOCAL_PATH)/../../../interface \

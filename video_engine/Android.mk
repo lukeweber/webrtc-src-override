@@ -17,6 +17,8 @@ LOCAL_MODULE := libwebrtc_vie_core
 LOCAL_MODULE_TAGS := optional
 LOCAL_CPP_EXTENSION := .cc
 LOCAL_SRC_FILES := \
+    encoder_state_feedback.cc \
+    call_stats.cc \
     vie_base_impl.cc \
     vie_capture_impl.cc \
     vie_codec_impl.cc \
@@ -41,7 +43,6 @@ LOCAL_SRC_FILES := \
     vie_frame_provider_base.cc \
     vie_input_manager.cc \
     vie_manager_base.cc \
-    vie_performance_monitor.cc \
     vie_receiver.cc \
     vie_remb.cc \
     vie_renderer.cc \
@@ -54,6 +55,7 @@ LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
 
 LOCAL_C_INCLUDES := \
+    $(MY_THIRD_PARTY_PATH) \
     $(LOCAL_PATH)/include\
     $(LOCAL_PATH)/.. \
     $(LOCAL_PATH)/../common_video/interface \
