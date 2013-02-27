@@ -58,7 +58,7 @@ LOCAL_C_INCLUDES := \
     $(MY_WEBRTC_PATH) \
     $(LOCAL_PATH)/include
 
-ifeq ($(ARCH_ARM_HAVE_ARMV7A),true)
+ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
 LOCAL_SRC_FILES += \
     filter_ar_fast_q12_armv7.S
 else

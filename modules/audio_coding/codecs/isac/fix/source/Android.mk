@@ -45,7 +45,7 @@ LOCAL_SRC_FILES := \
     spectrum_ar_model_tables.c \
     transform.c
 
-ifeq ($(ARCH_ARM_HAVE_ARMV7A),true)
+ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
 # Using .S (instead of .s) extention is to include a C header file in assembly.
 LOCAL_SRC_FILES += \
     lattice_armv7.S \
