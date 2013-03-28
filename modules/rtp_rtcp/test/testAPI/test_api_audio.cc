@@ -119,7 +119,7 @@ class AudioFeedback : public RtpAudioFeedback {
 
 class RtpRtcpAudioTest : public ::testing::Test {
  protected:
-  RtpRtcpAudioTest() {
+  RtpRtcpAudioTest() : fake_clock(123456) {
     test_CSRC[0] = 1234;
     test_CSRC[2] = 2345;
     test_id = 123;
@@ -183,18 +183,15 @@ class RtpRtcpAudioTest : public ::testing::Test {
   WebRtc_UWord32 test_timestamp;
   WebRtc_UWord16 test_sequence_number;
   WebRtc_UWord32 test_CSRC[webrtc::kRtpCsrcSize];
-  FakeRtpRtcpClock fake_clock;
+  SimulatedClock fake_clock;
 };
 
 TEST_F(RtpRtcpAudioTest, Basic) {
   EXPECT_EQ(0, module1->SetSSRC(test_ssrc));
   EXPECT_EQ(0, module1->SetStartTimestamp(test_timestamp));
 
-  EXPECT_FALSE(module1->TelephoneEvent());
-
   // Test detection at the end of a DTMF tone.
-  EXPECT_EQ(0, module2->SetTelephoneEventStatus(true, true, true));
-  EXPECT_EQ(true, module2->TelephoneEvent());
+  EXPECT_EQ(0, module2->SetTelephoneEventForwardToDecoder(true));
 
   EXPECT_EQ(0, module1->SetSendingStatus(true));
 
@@ -317,7 +314,7 @@ TEST_F(RtpRtcpAudioTest, DTMF) {
   for (;timeStamp <= 250 * 160; timeStamp += 160) {
     EXPECT_EQ(0, module1->SendOutgoingData(webrtc::kAudioFrameSpeech, 96,
                                            timeStamp, -1, test, 4));
-    fake_clock.IncrementTime(20);
+    fake_clock.AdvanceTimeMilliseconds(20);
     module1->Process();
   }
   EXPECT_EQ(0, module1->SendTelephoneEventOutband(32, 9000, 10));
@@ -325,7 +322,7 @@ TEST_F(RtpRtcpAudioTest, DTMF) {
   for (;timeStamp <= 740 * 160; timeStamp += 160) {
     EXPECT_EQ(0, module1->SendOutgoingData(webrtc::kAudioFrameSpeech, 96,
                                            timeStamp, -1, test, 4));
-    fake_clock.IncrementTime(20);
+    fake_clock.AdvanceTimeMilliseconds(20);
     module1->Process();
   }
 }

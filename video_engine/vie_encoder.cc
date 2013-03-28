@@ -20,6 +20,7 @@
 #include "modules/video_coding/main/interface/video_coding.h"
 #include "modules/video_coding/main/interface/video_coding_defines.h"
 #include "system_wrappers/interface/critical_section_wrapper.h"
+#include "system_wrappers/interface/logging.h"
 #include "system_wrappers/interface/tick_util.h"
 #include "system_wrappers/interface/trace.h"
 #include "video_engine/include/vie_codec.h"
@@ -217,8 +218,8 @@ ViEEncoder::~ViEEncoder() {
   module_process_thread_.DeRegisterModule(&vpm_);
   module_process_thread_.DeRegisterModule(default_rtp_rtcp_.get());
   module_process_thread_.DeRegisterModule(paced_sender_.get());
-  delete &vcm_;
-  delete &vpm_;
+  VideoCodingModule::Destroy(&vcm_);
+  VideoProcessingModule::Destroy(&vpm_);
   delete qm_callback_;
 }
 
@@ -279,7 +280,8 @@ WebRtc_Word32 ViEEncoder::GetCodec(WebRtc_UWord8 list_index,
 }
 
 WebRtc_Word32 ViEEncoder::RegisterExternalEncoder(webrtc::VideoEncoder* encoder,
-                                                  WebRtc_UWord8 pl_type) {
+                                                  WebRtc_UWord8 pl_type,
+                                                  bool internal_source) {
   WEBRTC_TRACE(webrtc::kTraceInfo, webrtc::kTraceVideo,
                ViEId(engine_id_, channel_id_), "%s: pltype %u", __FUNCTION__,
                pl_type);
@@ -287,7 +289,8 @@ WebRtc_Word32 ViEEncoder::RegisterExternalEncoder(webrtc::VideoEncoder* encoder,
   if (encoder == NULL)
     return -1;
 
-  if (vcm_.RegisterExternalEncoder(encoder, pl_type) != VCM_OK) {
+  if (vcm_.RegisterExternalEncoder(encoder, pl_type, internal_source) !=
+          VCM_OK) {
     WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
                  ViEId(engine_id_, channel_id_),
                  "Could not register external encoder");
@@ -303,11 +306,13 @@ WebRtc_Word32 ViEEncoder::DeRegisterExternalEncoder(WebRtc_UWord8 pl_type) {
 
   webrtc::VideoCodec current_send_codec;
   if (vcm_.SendCodec(&current_send_codec) == VCM_OK) {
-    if (vcm_.Bitrate(&current_send_codec.startBitrate) != 0) {
+    uint32_t current_bitrate_bps = 0;
+    if (vcm_.Bitrate(&current_bitrate_bps) != 0) {
       WEBRTC_TRACE(webrtc::kTraceWarning, webrtc::kTraceVideo,
                    ViEId(engine_id_, channel_id_),
                    "Failed to get the current encoder target bitrate.");
     }
+    current_send_codec.startBitrate = (current_bitrate_bps + 500) / 1000;
   }
 
   if (vcm_.RegisterExternalEncoder(NULL, pl_type) != VCM_OK) {
@@ -678,11 +683,14 @@ WebRtc_Word32 ViEEncoder::UpdateProtectionMethod() {
     webrtc::VideoCodec codec;
     if (vcm_.SendCodec(&codec) == 0) {
       WebRtc_UWord16 max_pay_load = default_rtp_rtcp_->MaxDataPayloadLength();
-      if (vcm_.Bitrate(&codec.startBitrate) != 0) {
+      uint32_t current_bitrate_bps = 0;
+      if (vcm_.Bitrate(&current_bitrate_bps) != 0) {
         WEBRTC_TRACE(webrtc::kTraceWarning, webrtc::kTraceVideo,
                      ViEId(engine_id_, channel_id_),
                      "Failed to get the current encoder target bitrate.");
       }
+      // Convert to start bitrate in kbps.
+      codec.startBitrate = (current_bitrate_bps + 500) / 1000;
       if (vcm_.RegisterSendCodec(&codec, number_of_cores_, max_pay_load) != 0) {
         WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
                      ViEId(engine_id_, channel_id_),
@@ -697,6 +705,18 @@ WebRtc_Word32 ViEEncoder::UpdateProtectionMethod() {
     vcm_.RegisterProtectionCallback(NULL);
   }
   return 0;
+}
+
+void ViEEncoder::SetSenderBufferingMode(int target_delay_ms) {
+  if (target_delay_ms > 0) {
+     // Disable external frame-droppers.
+     vcm_.EnableFrameDropper(false);
+     vpm_.EnableTemporalDecimation(false);
+  } else {
+    // Real-time mode - enable frame droppers.
+    vpm_.EnableTemporalDecimation(true);
+    vcm_.EnableFrameDropper(true);
+  }
 }
 
 WebRtc_Word32 ViEEncoder::SendData(
@@ -830,7 +850,8 @@ void ViEEncoder::OnReceivedIntraFrameRequest(uint32_t ssrc) {
     CriticalSectionScoped cs(data_cs_.get());
     std::map<unsigned int, int>::iterator stream_it = ssrc_streams_.find(ssrc);
     if (stream_it == ssrc_streams_.end()) {
-      assert(false);
+      LOG_F(LS_WARNING) << "ssrc not found: " << ssrc << ", map size "
+                        << ssrc_streams_.size();
       return;
     }
     std::map<unsigned int, WebRtc_Word64>::iterator time_it =
@@ -904,8 +925,8 @@ void ViEEncoder::OnNetworkChanged(const uint32_t bitrate_bps,
                "%s(bitrate_bps: %u, fraction_lost: %u, rtt_ms: %u",
                __FUNCTION__, bitrate_bps, fraction_lost, round_trip_time_ms);
 
+  vcm_.SetChannelParameters(bitrate_bps, fraction_lost, round_trip_time_ms);
   int bitrate_kbps = bitrate_bps / 1000;
-  vcm_.SetChannelParameters(bitrate_kbps, fraction_lost, round_trip_time_ms);
   paced_sender_->UpdateBitrate(bitrate_kbps);
   default_rtp_rtcp_->SetTargetSendBitrate(bitrate_bps);
 }

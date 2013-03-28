@@ -11,19 +11,17 @@
 // Implementation of Media Optimization Test
 // testing is done via the VCM module, no specific Media opt functionality.
 
-#include "media_opt_test.h"
+#include "webrtc/modules/video_coding/main/test/media_opt_test.h"
 
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
 #include <vector>
 
-#include "../source/event.h"
-#include "test_macros.h"
-#include "test_util.h" // send side callback
-#include "testsupport/metrics/video_metrics.h"
-#include "video_coding.h"
-
+#include "webrtc/modules/video_coding/main/interface/video_coding.h"
+#include "webrtc/modules/video_coding/main/test/test_macros.h"
+#include "webrtc/modules/video_coding/main/test/test_util.h"
+#include "webrtc/test/testsupport/metrics/video_metrics.h"
 
 using namespace webrtc;
 
@@ -32,9 +30,9 @@ int MediaOptTest::RunTest(int testNum, CmdArgs& args)
     Trace::CreateTrace();
     Trace::SetTraceFile((test::OutputPath() + "mediaOptTestTrace.txt").c_str());
     Trace::SetLevelFilter(webrtc::kTraceAll);
-    TickTimeBase clock;
-    VideoCodingModule* vcm = VideoCodingModule::Create(1, &clock);
-    MediaOptTest* mot = new MediaOptTest(vcm, &clock);
+    VideoCodingModule* vcm = VideoCodingModule::Create(1);
+    Clock* clock = Clock::GetRealTimeClock();
+    MediaOptTest* mot = new MediaOptTest(vcm, clock);
     if (testNum == 0)
     { // regular
          mot->Setup(0, args);
@@ -65,7 +63,7 @@ int MediaOptTest::RunTest(int testNum, CmdArgs& args)
 }
 
 
-MediaOptTest::MediaOptTest(VideoCodingModule* vcm, TickTimeBase* clock)
+MediaOptTest::MediaOptTest(VideoCodingModule* vcm, Clock* clock)
     : _vcm(vcm),
       _rtp(NULL),
       _outgoingTransport(NULL),
@@ -292,7 +290,8 @@ MediaOptTest::Perform()
     // START TEST
     I420VideoFrame sourceFrame;
     WebRtc_UWord8* tmpBuffer = new WebRtc_UWord8[_lengthSourceFrame];
-    _vcm->SetChannelParameters((WebRtc_UWord32)_bitRate, (WebRtc_UWord8)_lossRate, _rttMS);
+    _vcm->SetChannelParameters(static_cast<uint32_t>(1000 * _bitRate),
+                               (WebRtc_UWord8)_lossRate, _rttMS);
     _vcm->RegisterReceiveCallback(&receiveCallback);
 
     _frameCnt  = 0;

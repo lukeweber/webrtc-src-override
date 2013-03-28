@@ -15,16 +15,16 @@
 
 #include <vector>
 
-#include "modules/video_coding/main/source/codec_database.h"
-#include "modules/video_coding/main/source/frame_buffer.h"
-#include "modules/video_coding/main/source/generic_decoder.h"
-#include "modules/video_coding/main/source/generic_encoder.h"
-#include "modules/video_coding/main/source/jitter_buffer.h"
-#include "modules/video_coding/main/source/media_optimization.h"
-#include "modules/video_coding/main/source/receiver.h"
-#include "modules/video_coding/main/source/tick_time_base.h"
-#include "modules/video_coding/main/source/timing.h"
-#include "system_wrappers/interface/critical_section_wrapper.h"
+#include "webrtc/modules/video_coding/main/source/codec_database.h"
+#include "webrtc/modules/video_coding/main/source/frame_buffer.h"
+#include "webrtc/modules/video_coding/main/source/generic_decoder.h"
+#include "webrtc/modules/video_coding/main/source/generic_encoder.h"
+#include "webrtc/modules/video_coding/main/source/jitter_buffer.h"
+#include "webrtc/modules/video_coding/main/source/media_optimization.h"
+#include "webrtc/modules/video_coding/main/source/receiver.h"
+#include "webrtc/modules/video_coding/main/source/timing.h"
+#include "webrtc/system_wrappers/interface/clock.h"
+#include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
 
 namespace webrtc
 {
@@ -32,16 +32,16 @@ namespace webrtc
 class VCMProcessTimer
 {
 public:
-    VCMProcessTimer(WebRtc_UWord32 periodMs, TickTimeBase* clock)
+    VCMProcessTimer(WebRtc_UWord32 periodMs, Clock* clock)
         : _clock(clock),
           _periodMs(periodMs),
-          _latestMs(_clock->MillisecondTimestamp()) {}
+          _latestMs(_clock->TimeInMilliseconds()) {}
     WebRtc_UWord32 Period() const;
     WebRtc_UWord32 TimeUntilProcess() const;
     void Processed();
 
 private:
-    TickTimeBase*         _clock;
+    Clock*                _clock;
     WebRtc_UWord32        _periodMs;
     WebRtc_Word64         _latestMs;
 };
@@ -58,9 +58,8 @@ enum VCMKeyRequestMode
 class VideoCodingModuleImpl : public VideoCodingModule
 {
 public:
-    VideoCodingModuleImpl(const WebRtc_Word32 id,
-                          TickTimeBase* clock,
-                          bool delete_clock_on_destroy);
+    VideoCodingModuleImpl(const WebRtc_Word32 id, Clock* clock,
+                          EventFactory* event_factory, bool owns_event_factory);
 
     virtual ~VideoCodingModuleImpl();
 
@@ -110,7 +109,7 @@ public:
 
     // Set channel parameters
     virtual WebRtc_Word32 SetChannelParameters(
-        WebRtc_UWord32 availableBandWidth,
+        WebRtc_UWord32 target_bitrate,  // bits/s.
         WebRtc_UWord8 lossRate,
         WebRtc_UWord32 rtt);
 
@@ -260,6 +259,13 @@ public:
     // Set the receiver robustness mode.
     virtual int SetReceiverRobustnessMode(ReceiverRobustness robustnessMode,
                                           DecodeErrors errorMode);
+
+    virtual void SetNackSettings(size_t max_nack_list_size,
+                                 int max_packet_age_to_nack);
+
+    // Set the video delay for the receiver (default = 0).
+    virtual int SetMinReceiverDelay(int desired_delay_ms);
+
     // Enables recording of debugging information.
     virtual int StartDebugRecording(const char* file_name_utf8);
 
@@ -275,8 +281,7 @@ protected:
 
 private:
     WebRtc_Word32                       _id;
-    TickTimeBase*                       clock_;
-    bool                                delete_clock_on_destroy_;
+    Clock*                              clock_;
     CriticalSectionWrapper*             _receiveCritSect;
     bool                                _receiverInited;
     VCMTiming                           _timing;
@@ -297,12 +302,13 @@ private:
     VCMFrameBuffer                      _frameFromFile;
     VCMKeyRequestMode                   _keyRequestMode;
     bool                                _scheduleKeyRequest;
+    size_t                              max_nack_list_size_;
 
     CriticalSectionWrapper*             _sendCritSect; // Critical section for send side
     VCMGenericEncoder*                  _encoder;
     VCMEncodedFrameCallback             _encodedFrameCallback;
     std::vector<FrameType>              _nextFrameTypes;
-    VCMMediaOptimization                _mediaOpt;
+    media_optimization::VCMMediaOptimization _mediaOpt;
     VideoCodecType                      _sendCodecType;
     VCMSendStatisticsCallback*          _sendStatsCallback;
     FILE*                               _encoderInputFile;
@@ -311,6 +317,8 @@ private:
     VCMProcessTimer                     _sendStatsTimer;
     VCMProcessTimer                     _retransmissionTimer;
     VCMProcessTimer                     _keyRequestTimer;
+    EventFactory*                       event_factory_;
+    bool                                owns_event_factory_;
 };
 } // namespace webrtc
 #endif // WEBRTC_MODULES_VIDEO_CODING_VIDEO_CODING_IMPL_H_

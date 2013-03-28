@@ -11,7 +11,7 @@
   'targets': [
     {
       'target_name': 'system_wrappers',
-      'type': '<(library)',
+      'type': 'static_library',
       'include_dirs': [
         'spreadsortlib',
         '../interface',
@@ -25,6 +25,7 @@
       'sources': [
         '../interface/aligned_malloc.h',
         '../interface/atomic32.h',
+        '../interface/clock.h',
         '../interface/compile_assert.h',
         '../interface/condition_variable_wrapper.h',
         '../interface/cpu_info.h',
@@ -48,6 +49,7 @@
         '../interface/sleep.h',
         '../interface/sort.h',
         '../interface/static_instance.h',
+        '../interface/stringize_macros.h',
         '../interface/thread_wrapper.h',
         '../interface/tick_util.h',
         '../interface/trace.h',
@@ -56,11 +58,14 @@
         'atomic32_mac.cc',
         'atomic32_posix.cc',
         'atomic32_win.cc',
+        'clock.cc',
         'condition_variable.cc',
         'condition_variable_posix.cc',
         'condition_variable_posix.h',
-        'condition_variable_win.cc',
-        'condition_variable_win.h',
+        'condition_variable_event_win.cc',
+        'condition_variable_event_win.h',
+        'condition_variable_native_win.cc',
+        'condition_variable_native_win.h',
         'cpu.cc',
         'cpu_no_op.cc',
         'cpu_info.cc',
@@ -187,6 +192,11 @@
           ],
         }],
       ],
+      # Disable warnings to enable Win64 build, issue 1323.
+      'msvs_disabled_warnings': [
+        4267,  # size_t to int truncation.
+        4334,  # Ignore warning on shift operator promotion.
+      ],
     },
   ], # targets
   'conditions': [
@@ -198,7 +208,7 @@
             'chromium_code': 0,
           },
           'target_name': 'cpu_features_android',
-          'type': '<(library)',
+          'type': 'static_library',
           'sources': [
             # TODO(leozwang): Ideally we want to audomatically exclude .c files
             # as with .cc files, gyp currently only excludes .cc files.
@@ -207,7 +217,7 @@
           'conditions': [
             ['build_with_chromium==1', {
               'conditions': [
-                ['android_build_type != 0', {
+                ['android_webview_build == 1', {
                   'libraries': [
                     'cpufeatures.a'
                   ],
@@ -227,55 +237,6 @@
         },
       ],
     }],
-    ['include_tests==1', {
-      'targets': [
-        {
-          'target_name': 'system_wrappers_unittests',
-          'type': 'executable',
-          'dependencies': [
-            'system_wrappers',
-            '<(DEPTH)/testing/gtest.gyp:gtest',
-            '<(webrtc_root)/test/test.gyp:test_support_main',
-          ],
-          'sources': [
-            'aligned_malloc_unittest.cc',
-            'condition_variable_unittest.cc',
-            'cpu_wrapper_unittest.cc',
-            'cpu_measurement_harness.h',
-            'cpu_measurement_harness.cc',
-            'critical_section_unittest.cc',
-            'event_tracer_unittest.cc',
-            'list_unittest.cc',
-            'logging_unittest.cc',
-            'map_unittest.cc',
-            'data_log_unittest.cc',
-            'data_log_unittest_disabled.cc',
-            'data_log_helpers_unittest.cc',
-            'data_log_c_helpers_unittest.c',
-            'data_log_c_helpers_unittest.h',
-            'thread_unittest.cc',
-            'thread_posix_unittest.cc',
-            'trace_unittest.cc',
-            'unittest_utilities_unittest.cc',
-          ],
-          'conditions': [
-            ['enable_data_logging==1', {
-              'sources!': [ 'data_log_unittest_disabled.cc', ],
-            }, {
-              'sources!': [ 'data_log_unittest.cc', ],
-            }],
-            ['os_posix==0', {
-              'sources!': [ 'thread_posix_unittest.cc', ],
-            }],
-          ],
-        },
-      ], # targets
-    }], # include_tests
   ], # conditions
 }
 
-# Local Variables:
-# tab-width:2
-# indent-tabs-mode:nil
-# End:
-# vim: set expandtab tabstop=2 shiftwidth=2:

@@ -8,14 +8,16 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "generic_codec_test.h"
+#include "webrtc/modules/video_coding/main/test/generic_codec_test.h"
+
 #include <cmath>
 #include <stdio.h>
-#include "../source/event.h"
-#include "rtp_rtcp.h"
-#include "common_video/interface/i420_video_frame.h"
-#include "test_macros.h"
-#include "modules/video_coding/main/source/mock/fake_tick_time.h"
+
+#include "webrtc/common_video/interface/i420_video_frame.h"
+#include "webrtc/modules/rtp_rtcp/interface/rtp_rtcp.h"
+#include "webrtc/modules/video_coding/main/interface/video_coding.h"
+#include "webrtc/modules/video_coding/main/test/test_macros.h"
+#include "webrtc/system_wrappers/interface/clock.h"
 
 using namespace webrtc;
 
@@ -23,12 +25,10 @@ enum { kMaxWaitEncTimeMs = 100 };
 
 int GenericCodecTest::RunTest(CmdArgs& args)
 {
-#if !defined(EVENT_DEBUG)
-    printf("\n\nEnable debug events to run this test!\n\n");
-    return -1;
-#endif
-    FakeTickTime clock(0);
-    VideoCodingModule* vcm = VideoCodingModule::Create(1, &clock);
+    SimulatedClock clock(0);
+    NullEventFactory event_factory;
+    VideoCodingModule* vcm = VideoCodingModule::Create(1, &clock,
+                                                       &event_factory);
     GenericCodecTest* get = new GenericCodecTest(vcm, &clock);
     Trace::CreateTrace();
     Trace::SetTraceFile(
@@ -41,7 +41,8 @@ int GenericCodecTest::RunTest(CmdArgs& args)
     return 0;
 }
 
-GenericCodecTest::GenericCodecTest(VideoCodingModule* vcm, FakeTickTime* clock):
+GenericCodecTest::GenericCodecTest(VideoCodingModule* vcm,
+                                   SimulatedClock* clock):
 _clock(clock),
 _vcm(vcm),
 _width(0),
@@ -137,7 +138,8 @@ GenericCodecTest::Perform(CmdArgs& args)
     TEST(_vcm->RegisterSendCodec(&sendCodec, 1, 1440) < 0); // bad bit rate
     _vcm->Codec(kVideoCodecVP8, &sendCodec);
     _vcm->InitializeSender();
-    TEST(_vcm->SetChannelParameters(100, 0, 0) < 0);// setting rate when encoder uninitialized
+    // Setting rate when encoder uninitialized.
+    TEST(_vcm->SetChannelParameters(100000, 0, 0) < 0);
     // register all availbale decoders -- need to have more for this test
     for (i=0; i< NumberOfCodecs; i++)
     {
@@ -158,7 +160,8 @@ GenericCodecTest::Perform(CmdArgs& args)
     sourceFrame.set_timestamp(_timeStamp++);
     TEST(_vcm->AddVideoFrame(sourceFrame) < 0 ); // encoder uninitialized
     _vcm->InitializeReceiver();
-    TEST(_vcm->SetChannelParameters(100, 0, 0) < 0);// setting rtt when receiver uninitialized
+    // Setting rtt when receiver uninitialized.
+    TEST(_vcm->SetChannelParameters(100000, 0, 0) < 0);
 
       /**************************************/
      /* encoder/decoder individuality test */
@@ -309,11 +312,13 @@ GenericCodecTest::Perform(CmdArgs& args)
             _vcm->RegisterSendCodec(&_sendCodec, 1, 1440);
             _vcm->RegisterTransportCallback(_encodeCompleteCallback);
             // up to here
-            _vcm->SetChannelParameters((WebRtc_UWord32)_bitRate, 0, 20);
+            _vcm->SetChannelParameters(static_cast<uint32_t>(1000 * _bitRate),
+                                       0, 20);
             _frameCnt = 0;
             totalBytes = 0;
             _encodeCompleteCallback->Initialize();
-            sendStats.SetTargetFrameRate(static_cast<WebRtc_UWord32>(_frameRate));
+            sendStats.set_framerate(static_cast<WebRtc_UWord32>(_frameRate));
+            sendStats.set_bitrate(1000 * _bitRate);
             _vcm->RegisterSendStatisticsCallback(&sendStats);
             while (fread(tmpBuffer, 1, _lengthSourceFrame, _sourceFile) ==
                 _lengthSourceFrame)
@@ -332,10 +337,6 @@ GenericCodecTest::Perform(CmdArgs& args)
                 IncrementDebugClock(_frameRate);
                 // The following should be uncommneted for timing tests. Release tests only include
                 // compliance with full sequence bit rate.
-
-
-                //totalBytes = WaitForEncodedFrame();
-                //currentTime = VCMTickTime::MillisecondTimestamp();//clock()/(double)CLOCKS_PER_SEC;
                 if (_frameCnt == _frameRate)// @ 1sec
                 {
                     totalBytesOneSec =  _encodeCompleteCallback->EncodedBytes();//totalBytes;
@@ -431,12 +432,13 @@ GenericCodecTest::Perform(CmdArgs& args)
     _vcm->InitializeSender();
     _sendCodec.maxFramerate = static_cast<WebRtc_UWord8>(_frameRate / 2.0 + 0.5f);
     _vcm->RegisterSendCodec(&_sendCodec, 4, 1440);
-    _vcm->SetChannelParameters(2000, 0, 0);
+    _vcm->SetChannelParameters(2000000, 0, 0);
     _vcm->RegisterTransportCallback(_encodeCompleteCallback);
     // up to here
-    _vcm->SetChannelParameters((WebRtc_UWord32)_bitRate, 0, 20);
+    _vcm->SetChannelParameters(static_cast<uint32_t>(1000 * _bitRate), 0, 20);
     _encodeCompleteCallback->Initialize();
-    sendStats.SetTargetFrameRate(static_cast<WebRtc_UWord32>(_frameRate));
+    sendStats.set_framerate(static_cast<WebRtc_UWord32>(_frameRate));
+    sendStats.set_bitrate(1000 * _bitRate);
     _vcm->RegisterSendStatisticsCallback(&sendStats);
     rewind(_sourceFile);
     while (fread(tmpBuffer, 1, _lengthSourceFrame, _sourceFile) ==
@@ -482,8 +484,8 @@ GenericCodecTest::Print()
 float
 GenericCodecTest::WaitForEncodedFrame() const
 {
-    WebRtc_Word64 startTime = _clock->MillisecondTimestamp();
-    while (_clock->MillisecondTimestamp() - startTime < kMaxWaitEncTimeMs*10)
+    WebRtc_Word64 startTime = _clock->TimeInMilliseconds();
+    while (_clock->TimeInMilliseconds() - startTime < kMaxWaitEncTimeMs*10)
     {
         if (_encodeCompleteCallback->EncodeComplete())
         {
@@ -496,7 +498,7 @@ GenericCodecTest::WaitForEncodedFrame() const
 void
 GenericCodecTest::IncrementDebugClock(float frameRate)
 {
-    _clock->IncrementDebugClock(1000/frameRate);
+    _clock->AdvanceTimeMilliseconds(1000/frameRate);
 }
 
 int

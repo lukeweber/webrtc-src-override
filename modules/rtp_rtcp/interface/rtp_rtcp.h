@@ -13,8 +13,8 @@
 
 #include <vector>
 
-#include "modules/interface/module.h"
-#include "modules/rtp_rtcp/interface/rtp_rtcp_defines.h"
+#include "webrtc/modules/interface/module.h"
+#include "webrtc/modules/rtp_rtcp/interface/rtp_rtcp_defines.h"
 
 namespace webrtc {
 // Forward declarations.
@@ -26,31 +26,19 @@ class Transport;
 class RtpRtcp : public Module {
  public:
   struct Configuration {
-    Configuration()
-        : id(-1),
-          audio(false),
-          clock(NULL),
-          default_module(NULL),
-          incoming_data(NULL),
-          incoming_messages(NULL),
-          outgoing_transport(NULL),
-          rtcp_feedback(NULL),
-          intra_frame_callback(NULL),
-          bandwidth_callback(NULL),
-          rtt_observer(NULL),
-          audio_messages(NULL),
-          remote_bitrate_estimator(NULL),
-          paced_sender(NULL) {
-    }
+    Configuration();
+
    /*  id                   - Unique identifier of this RTP/RTCP module object
     *  audio                - True for a audio version of the RTP/RTCP module
     *                         object false will create a video version
     *  clock                - The clock to use to read time. If NULL object
     *                         will be using the system clock.
     *  incoming_data        - Callback object that will receive the incoming
-    *                         data
+    *                         data. May not be NULL; default callback will do
+    *                         nothing.
     *  incoming_messages    - Callback object that will receive the incoming
-    *                         RTP messages.
+    *                         RTP messages. May not be NULL; default callback
+    *                         will do nothing.
     *  outgoing_transport   - Transport object that will be called when packets
     *                         are ready to be sent out on the network
     *  rtcp_feedback        - Callback object that will receive the incoming
@@ -58,7 +46,8 @@ class RtpRtcp : public Module {
     *  intra_frame_callback - Called when the receiver request a intra frame.
     *  bandwidth_callback   - Called when we receive a changed estimate from
     *                         the receiver of out stream.
-    *  audio_messages       - Telehone events.
+    *  audio_messages       - Telehone events. May not be NULL; default callback
+    *                         will do nothing.
     *  remote_bitrate_estimator - Estimates the bandwidth available for a set of
     *                             streams from the same client.
     *  paced_sender             - Spread any bursts of packets into smaller
@@ -66,7 +55,7 @@ class RtpRtcp : public Module {
     */
     int32_t id;
     bool audio;
-    RtpRtcpClock* clock;
+    Clock* clock;
     RtpRtcp* default_module;
     RtpData* incoming_data;
     RtpFeedback* incoming_messages;
@@ -427,14 +416,14 @@ class RtpRtcp : public Module {
     /*
     * Turn on/off sending RTX (RFC 4588) on a specific SSRC.
     */
-    virtual WebRtc_Word32 SetRTXSendStatus(const bool enable,
+    virtual WebRtc_Word32 SetRTXSendStatus(const RtxMode mode,
                                            const bool setSSRC,
                                            const WebRtc_UWord32 SSRC) = 0;
 
     /*
     * Get status of sending RTX (RFC 4588) on a specific SSRC.
     */
-    virtual WebRtc_Word32 RTXSendStatus(bool* enable,
+    virtual WebRtc_Word32 RTXSendStatus(RtxMode* mode,
                                         WebRtc_UWord32* SSRC) const = 0;
 
     /*
@@ -472,12 +461,6 @@ class RtpRtcp : public Module {
                              WebRtc_UWord32* videoRate,
                              WebRtc_UWord32* fecRate,
                              WebRtc_UWord32* nackRate) const = 0;
-
-    /*
-     *  Get the receive-side estimate of the available bandwidth.
-     */
-    virtual int EstimatedReceiveBandwidth(
-        WebRtc_UWord32* available_bandwidth) const = 0;
 
     /*
     *   Used by the codec module to deliver a video or audio frame for
@@ -750,10 +733,14 @@ class RtpRtcp : public Module {
 
     /*
     *   Turn negative acknowledgement requests on/off
+    *   |max_reordering_threshold| should be set to how much a retransmitted
+    *   packet can be expected to be reordered (in sequence numbers) compared to
+    *   a packet which has not been retransmitted.
     *
     *   return -1 on failure else 0
     */
-    virtual WebRtc_Word32 SetNACKStatus(const NACKMethod method) = 0;
+    virtual WebRtc_Word32 SetNACKStatus(const NACKMethod method,
+                                        int max_reordering_threshold) = 0;
 
     /*
      *  TODO(holmer): Propagate this API to VideoEngine.
@@ -791,7 +778,7 @@ class RtpRtcp : public Module {
     */
     virtual WebRtc_Word32 SetStorePacketsStatus(
         const bool enable,
-        const WebRtc_UWord16 numberToStore = 200) = 0;
+        const WebRtc_UWord16 numberToStore) = 0;
 
     /**************************************************************************
     *
@@ -809,19 +796,11 @@ class RtpRtcp : public Module {
         const WebRtc_UWord16 packetSizeSamples) = 0;
 
     /*
-    *   Outband TelephoneEvent(DTMF) detection
+    *   Forward DTMF to decoder for playout.
     *
     *   return -1 on failure else 0
     */
-    virtual WebRtc_Word32 SetTelephoneEventStatus(
-        const bool enable,
-        const bool forwardToDecoder,
-        const bool detectEndOfTone = false) = 0;
-
-    /*
-    *   Is outband TelephoneEvent(DTMF) turned on/off?
-    */
-    virtual bool TelephoneEvent() const = 0;
+    virtual int SetTelephoneEventForwardToDecoder(bool forwardToDecoder) = 0;
 
     /*
     *   Returns true if received DTMF events are forwarded to the decoder using

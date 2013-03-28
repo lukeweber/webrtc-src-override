@@ -342,13 +342,6 @@ typedef struct        // All levels are reported in dB
     StatVal a_nlp;
 } EchoStatistics;
 
-enum TelephoneEventDetectionMethods
-{
-    kInBand = 0,
-    kOutOfBand = 1,
-    kInAndOutOfBand = 2
-};
-
 enum NsModes    // type of Noise Suppression
 {
     kNsUnchanged = 0,   // previously set mode
@@ -437,18 +430,6 @@ enum NetEqModes             // NetEQ playout configurations
     kNetEqOff = 3,
 };
 
-enum NetEqBgnModes          // NetEQ Background Noise (BGN) configurations
-{
-    // BGN is always on and will be generated when the incoming RTP stream
-    // stops (default).
-    kBgnOn = 0,
-    // The BGN is faded to zero (complete silence) after a few seconds.
-    kBgnFade = 1,
-    // BGN is not used at all. Silence is produced after speech extrapolation
-    // has faded.
-    kBgnOff = 2,
-};
-
 enum OnHoldModes            // On Hold direction
 {
     kHoldSendAndPlay = 0,    // Put both sending and playing in on-hold state.
@@ -530,6 +511,7 @@ struct VideoCodecVP8
     bool                 errorConcealmentOn;
     bool                 automaticResizeOn;
     bool                 frameDroppingOn;
+    int                  keyFrameInterval;
 };
 
 // Unknown specific
@@ -544,6 +526,7 @@ enum VideoCodecType
     kVideoCodecI420,
     kVideoCodecRED,
     kVideoCodecULPFEC,
+    kVideoCodecGeneric,
     kVideoCodecUnknown
 };
 
@@ -562,7 +545,14 @@ struct SimulcastStream
     unsigned short      height;
     unsigned char       numberOfTemporalLayers;
     unsigned int        maxBitrate;
+    unsigned int        targetBitrate;
+    unsigned int        minBitrate;
     unsigned int        qpMax; // minimum quality
+};
+
+enum VideoCodecMode {
+  kRealtimeVideo,
+  kScreensharing
 };
 
 // Common video codec properties
@@ -585,6 +575,8 @@ struct VideoCodec
     unsigned int        qpMax;
     unsigned char       numberOfSimulcastStreams;
     SimulcastStream     simulcastStream[kMaxSimulcastStreams];
+
+    VideoCodecMode      mode;
 };
 
 // Bandwidth over-use detector options.  These are used to drive

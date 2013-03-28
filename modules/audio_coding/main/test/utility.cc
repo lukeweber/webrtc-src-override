@@ -14,9 +14,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "audio_coding_module.h"
-#include "common_types.h"
-#include "gtest/gtest.h"
+#include "testing/gtest/include/gtest/gtest.h"
+#include "webrtc/common_types.h"
+#include "webrtc/modules/audio_coding/main/interface/audio_coding_module.h"
+#include "webrtc/modules/audio_coding/main/source/acm_common_defs.h"
 
 #define NUM_CODECS_WITH_FIXED_PAYLOAD_TYPE 13
 
@@ -138,7 +139,7 @@ ChooseCodec(
         }
     } while(outOfRange);
 
-    CHECK_ERROR(AudioCodingModule::Codec((WebRtc_UWord8)codecID, codecInst));
+    CHECK_ERROR(AudioCodingModule::Codec((WebRtc_UWord8)codecID, &codecInst));
     return 0;
 }
 
@@ -151,7 +152,7 @@ PrintCodecs()
     printf("No  Name                [Hz]    [bps]\n");     
     for(WebRtc_UWord8 codecCntr = 0; codecCntr < noCodec; codecCntr++)
     {
-        AudioCodingModule::Codec(codecCntr, codecInst);
+        AudioCodingModule::Codec(codecCntr, &codecInst);
         printf("%2d- %-18s %5d   %6d\n", 
             codecCntr, codecInst.plname, codecInst.plfreq, codecInst.rate);
     }

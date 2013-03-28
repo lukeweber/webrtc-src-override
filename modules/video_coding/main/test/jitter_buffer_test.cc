@@ -8,21 +8,21 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include <math.h>
-#include <stdio.h>
+#include "webrtc/modules/video_coding/main/test/jitter_estimate_test.h"
 
-#include "common_types.h"
-#include "../source/event.h"
-#include "frame_buffer.h"
-#include "inter_frame_delay.h"
-#include "jitter_buffer.h"
-#include "jitter_estimate_test.h"
-#include "jitter_estimator.h"
-#include "media_opt_util.h"
-#include "modules/video_coding/main/source/tick_time_base.h"
-#include "packet.h"
-#include "test_util.h"
-#include "test_macros.h"
+#include <math.h>
+
+#include "webrtc/common_types.h"
+#include "webrtc/modules/video_coding/main/interface/video_coding.h"
+#include "webrtc/modules/video_coding/main/source/frame_buffer.h"
+#include "webrtc/modules/video_coding/main/source/inter_frame_delay.h"
+#include "webrtc/modules/video_coding/main/source/jitter_buffer.h"
+#include "webrtc/modules/video_coding/main/source/jitter_estimator.h"
+#include "webrtc/modules/video_coding/main/source/media_opt_util.h"
+#include "webrtc/modules/video_coding/main/source/packet.h"
+#include "webrtc/modules/video_coding/main/test/test_util.h"
+#include "webrtc/modules/video_coding/main/test/test_macros.h"
+#include "webrtc/system_wrappers/interface/clock.h"
 
 // TODO(holmer): Get rid of this to conform with style guide.
 using namespace webrtc;
@@ -93,11 +93,7 @@ int CheckOutFrame(VCMEncodedFrame* frameOut, unsigned int size, bool startCode)
 
 int JitterBufferTest(CmdArgs& args)
 {
-    // Don't run these tests with debug event.
-#if defined(EVENT_DEBUG)
-    return -1;
-#endif
-    TickTimeBase clock;
+    Clock* clock = Clock::GetRealTimeClock();
 
     // Start test
     WebRtc_UWord16 seqNum = 1234;
@@ -106,7 +102,8 @@ int JitterBufferTest(CmdArgs& args)
     WebRtc_UWord8 data[1500];
     VCMPacket packet(data, size, seqNum, timeStamp, true);
 
-    VCMJitterBuffer jb(&clock);
+    NullEventFactory event_factory;
+    VCMJitterBuffer jb(clock, &event_factory, -1, -1, true);
 
     seqNum = 1234;
     timeStamp = 123*90;
@@ -718,24 +715,6 @@ int JitterBufferTest(CmdArgs& args)
     // reset
     packet.insertStartCode = false;
     //printf("DONE H.264 insert start code test 2 packets\n");
-
-    //
-    // TEST statistics
-    //
-    WebRtc_UWord32 numDeltaFrames = 0;
-    WebRtc_UWord32 numKeyFrames = 0;
-    jb.FrameStatistics(&numDeltaFrames, &numKeyFrames);
-
-    TEST(numDeltaFrames == 8);
-    TEST(numKeyFrames == 1);
-
-    WebRtc_UWord32 frameRate;
-    WebRtc_UWord32 bitRate;
-    jb.IncomingRateStatistics(&frameRate, &bitRate);
-
-    // these depend on CPU speed works on a T61
-    TEST(frameRate > 30);
-    TEST(bitRate > 10000000);
 
 
     jb.Flush();

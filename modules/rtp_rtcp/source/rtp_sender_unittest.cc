@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 
 #include "webrtc/modules/rtp_rtcp/interface/rtp_rtcp_defines.h"
+#include "webrtc/modules/rtp_rtcp/source/rtp_format_video_generic.h"
 #include "webrtc/modules/rtp_rtcp/source/rtp_header_extension.h"
 #include "webrtc/modules/rtp_rtcp/source/rtp_sender.h"
 #include "webrtc/modules/rtp_rtcp/source/rtp_utility.h"
@@ -32,28 +33,6 @@ const uint16_t kSeqNum = 33;
 const int kTimeOffset = 22222;
 const int kMaxPacketLength = 1500;
 }  // namespace
-
-class FakeClockTest : public RtpRtcpClock {
- public:
-  FakeClockTest() {
-    time_in_ms_ = 123456;
-  }
-  // Return a timestamp in milliseconds relative to some arbitrary
-  // source; the source is fixed for this clock.
-  virtual WebRtc_Word64 GetTimeInMS() {
-    return time_in_ms_;
-  }
-  // Retrieve an NTP absolute timestamp.
-  virtual void CurrentNTP(WebRtc_UWord32& secs, WebRtc_UWord32& frac) {
-    secs = time_in_ms_ / 1000;
-    frac = (time_in_ms_ % 1000) * 4294967;
-  }
-  void IncrementTime(WebRtc_UWord32 time_increment_ms) {
-    time_in_ms_ += time_increment_ms;
-  }
- private:
-  WebRtc_Word64 time_in_ms_;
-};
 
 class LoopbackTransportTest : public webrtc::Transport {
  public:
@@ -78,14 +57,14 @@ class LoopbackTransportTest : public webrtc::Transport {
 class RtpSenderTest : public ::testing::Test {
  protected:
   RtpSenderTest()
-    : fake_clock_(),
+    : fake_clock_(123456),
       rtp_sender_(new RTPSender(0, false, &fake_clock_, &transport_, NULL,
                                 NULL)),
       kMarkerBit(true),
       kType(kRtpExtensionTransmissionTimeOffset) {
     rtp_sender_->SetSequenceNumber(kSeqNum);
   }
-  FakeClockTest fake_clock_;
+  SimulatedClock fake_clock_;
   scoped_ptr<RTPSender> rtp_sender_;
   LoopbackTransportTest transport_;
   const bool kMarkerBit;
@@ -223,11 +202,11 @@ TEST_F(RtpSenderTest, DISABLED_TrafficSmoothing) {
   EXPECT_EQ(0, rtp_sender_->SendToNetwork(packet_,
                                           0,
                                           rtp_length,
-                                          fake_clock_.GetTimeInMS(),
+                                          fake_clock_.TimeInMilliseconds(),
                                           kAllowRetransmission));
   EXPECT_EQ(0, transport_.packets_sent_);
   const int kStoredTimeInMs = 100;
-  fake_clock_.IncrementTime(kStoredTimeInMs);
+  fake_clock_.AdvanceTimeMilliseconds(kStoredTimeInMs);
   // Process send bucket. Packet should now be sent.
   EXPECT_EQ(1, transport_.packets_sent_);
   EXPECT_EQ(rtp_length, transport_.last_sent_packet_len_);
@@ -242,4 +221,63 @@ TEST_F(RtpSenderTest, DISABLED_TrafficSmoothing) {
   // Verify transmission time offset.
   EXPECT_EQ(kStoredTimeInMs * 90, rtp_header.extension.transmissionTimeOffset);
 }
+
+TEST_F(RtpSenderTest, SendGenericVideo) {
+  char payload_name[RTP_PAYLOAD_NAME_SIZE] = "GENERIC";
+  const uint8_t payload_type = 127;
+  ASSERT_EQ(0, rtp_sender_->RegisterPayload(payload_name, payload_type, 90000,
+                                            0, 1500));
+  uint8_t payload[] = {47, 11, 32, 93, 89};
+
+  // Send keyframe
+  ASSERT_EQ(0, rtp_sender_->SendOutgoingData(kVideoFrameKey, payload_type, 1234,
+                                             4321, payload, sizeof(payload),
+                                             NULL));
+
+  ModuleRTPUtility::RTPHeaderParser rtp_parser(transport_.last_sent_packet_,
+      transport_.last_sent_packet_len_);
+  webrtc::WebRtcRTPHeader rtp_header;
+  ASSERT_TRUE(rtp_parser.Parse(rtp_header));
+
+  const uint8_t* payload_data = ModuleRTPUtility::GetPayloadData(&rtp_header,
+      transport_.last_sent_packet_);
+  uint8_t generic_header = *payload_data++;
+
+  ASSERT_EQ(sizeof(payload) + sizeof(generic_header),
+            ModuleRTPUtility::GetPayloadDataLength(&rtp_header,
+            transport_.last_sent_packet_len_));
+
+  EXPECT_TRUE(generic_header & RtpFormatVideoGeneric::kKeyFrameBit);
+  EXPECT_TRUE(generic_header & RtpFormatVideoGeneric::kFirstPacketBit);
+
+  EXPECT_EQ(0, memcmp(payload, payload_data, sizeof(payload)));
+
+  // Send delta frame
+  payload[0] = 13;
+  payload[1] = 42;
+  payload[4] = 13;
+
+  ASSERT_EQ(0, rtp_sender_->SendOutgoingData(kVideoFrameDelta, payload_type,
+                                             1234, 4321, payload,
+                                             sizeof(payload), NULL));
+
+  ModuleRTPUtility::RTPHeaderParser rtp_parser2(transport_.last_sent_packet_,
+      transport_.last_sent_packet_len_);
+  ASSERT_TRUE(rtp_parser.Parse(rtp_header));
+
+  payload_data = ModuleRTPUtility::GetPayloadData(&rtp_header,
+      transport_.last_sent_packet_);
+  generic_header = *payload_data++;
+
+  EXPECT_FALSE(generic_header & RtpFormatVideoGeneric::kKeyFrameBit);
+  EXPECT_TRUE(generic_header & RtpFormatVideoGeneric::kFirstPacketBit);
+
+  ASSERT_EQ(sizeof(payload) + sizeof(generic_header),
+            ModuleRTPUtility::GetPayloadDataLength(&rtp_header,
+      transport_.last_sent_packet_len_));
+
+  EXPECT_EQ(0, memcmp(payload, payload_data, sizeof(payload)));
+}
+
 }  // namespace webrtc
+

@@ -8,21 +8,22 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "EncodeDecodeTest.h"
+#include "webrtc/modules/audio_coding/main/test/EncodeDecodeTest.h"
 
-#include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <sstream>
 #include <string>
 
-#include "gtest/gtest.h"
-
-#include "audio_coding_module.h"
-#include "common_types.h"
-#include "testsupport/fileutils.h"
-#include "trace.h"
-#include "utility.h"
+#include "testing/gtest/include/gtest/gtest.h"
+#include "webrtc/common_types.h"
+#include "webrtc/modules/audio_coding/main/interface/audio_coding_module.h"
+#include "webrtc/modules/audio_coding/main/source/acm_common_defs.h"
+#include "webrtc/modules/audio_coding/main/test/utility.h"
+#include "webrtc/system_wrappers/interface/trace.h"
+#include "webrtc/test/testsupport/fileutils.h"
 
 namespace webrtc {
 
@@ -73,14 +74,14 @@ void Sender::Setup(AudioCodingModule *acm, RTPStream *rtpStream) {
     // Choose codec on command line.
     printf("List of supported codec.\n");
     for (int n = 0; n < noOfCodecs; n++) {
-      acm->Codec(n, sendCodec);
+      acm->Codec(n, &sendCodec);
       printf("%d %s\n", n, sendCodec.plname);
     }
     printf("Choose your codec:");
     ASSERT_GT(scanf("%d", &codecNo), 0);
   }
 
-  acm->Codec(codecNo, sendCodec);
+  acm->Codec(codecNo, &sendCodec);
   if (!strcmp(sendCodec.plname, "CELT")) {
     sendCodec.channels = 1;
   }
@@ -144,7 +145,7 @@ void Receiver::Setup(AudioCodingModule *acm, RTPStream *rtpStream) {
 
   noOfCodecs = acm->NumberOfCodecs();
   for (int i = 0; i < noOfCodecs; i++) {
-    acm->Codec((WebRtc_UWord8) i, recvCodec);
+    acm->Codec((WebRtc_UWord8) i, &recvCodec);
     if (acm->RegisterReceiveCodec(recvCodec) != 0) {
       printf("Unable to register codec: for run: codecId: %d\n", codeId);
       exit(1);
@@ -224,7 +225,7 @@ bool Receiver::IncomingPacket() {
 bool Receiver::PlayoutData() {
   AudioFrame audioFrame;
 
-  if (_acm->PlayoutData10Ms(_frequency, audioFrame) != 0) {
+  if (_acm->PlayoutData10Ms(_frequency, &audioFrame) != 0) {
     printf("Error when calling PlayoutData10Ms, for run: codecId: %d\n",
            codeId);
     exit(1);
@@ -305,7 +306,7 @@ void EncodeDecodeTest::Perform() {
   }
   if (_testMode != 2) {
     for (int n = 0; n < numCodecs; n++) {
-      acm->Codec(n, sendCodecTmp);
+      acm->Codec(n, &sendCodecTmp);
       if (STR_CASE_CMP(sendCodecTmp.plname, "telephone-event") == 0) {
         numPars[n] = 0;
       } else if (STR_CASE_CMP(sendCodecTmp.plname, "cn") == 0) {
@@ -381,7 +382,7 @@ void EncodeDecodeTest::EncodeToFile(int fileType, int codeId, int* codePars,
 
   _sender.Setup(acm, &rtpFile);
   struct CodecInst sendCodecInst;
-  if (acm->SendCodec(sendCodecInst) >= 0) {
+  if (acm->SendCodec(&sendCodecInst) >= 0) {
     _sender.Run();
   }
   _sender.Teardown();

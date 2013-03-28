@@ -11,23 +11,24 @@
  *
  */
 
-#include "modules/video_coding/codecs/vp8/vp8_impl.h"
+#include "webrtc/modules/video_coding/codecs/vp8/vp8_impl.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <vector>
 
 #include "vpx/vpx_encoder.h"
 #include "vpx/vpx_decoder.h"
 #include "vpx/vp8cx.h"
 #include "vpx/vp8dx.h"
 
-#include "common_video/libyuv/include/webrtc_libyuv.h"
-#include "module_common_types.h"
-#include "modules/video_coding/codecs/vp8/reference_picture_selection.h"
-#include "modules/video_coding/codecs/vp8/temporal_layers.h"
-#include "system_wrappers/interface/tick_util.h"
-#include "system_wrappers/interface/trace_event.h"
+#include "webrtc/common_video/libyuv/include/webrtc_libyuv.h"
+#include "webrtc/modules/interface/module_common_types.h"
+#include "webrtc/modules/video_coding/codecs/vp8/default_temporal_layers.h"
+#include "webrtc/modules/video_coding/codecs/vp8/reference_picture_selection.h"
+#include "webrtc/system_wrappers/interface/tick_util.h"
+#include "webrtc/system_wrappers/interface/trace_event.h"
 
 enum { kVp8ErrorPropagationTh = 30 };
 
@@ -112,7 +113,8 @@ int VP8EncoderImpl::SetRates(uint32_t new_bitrate_kbit,
   config_->rc_target_bitrate = new_bitrate_kbit;  // in kbit/s
 
 #if WEBRTC_LIBVPX_VERSION >= 971
-  temporal_layers_->ConfigureBitrates(new_bitrate_kbit, config_);
+  temporal_layers_->ConfigureBitrates(new_bitrate_kbit, codec_.maxBitrate,
+                                      new_framerate, config_);
 #endif
   codec_.maxFramerate = new_framerate;
 
@@ -162,7 +164,7 @@ int VP8EncoderImpl::InitEncode(const VideoCodec* inst,
   int num_temporal_layers = inst->codecSpecific.VP8.numberOfTemporalLayers > 1 ?
       inst->codecSpecific.VP8.numberOfTemporalLayers : 1;
   assert(temporal_layers_ == NULL);
-  temporal_layers_ = new TemporalLayers(num_temporal_layers);
+  temporal_layers_ = new DefaultTemporalLayers(num_temporal_layers, rand());
 #endif
   // random start 16 bits is enough.
   picture_id_ = static_cast<uint16_t>(rand()) & 0x7FFF;
@@ -189,7 +191,8 @@ int VP8EncoderImpl::InitEncode(const VideoCodec* inst,
   config_->rc_target_bitrate = inst->startBitrate;  // in kbit/s
 
 #if WEBRTC_LIBVPX_VERSION >= 971
-  temporal_layers_->ConfigureBitrates(inst->startBitrate, config_);
+  temporal_layers_->ConfigureBitrates(inst->startBitrate, inst->maxBitrate,
+                                      inst->maxFramerate, config_);
 #endif
   // setting the time base of the codec
   config_->g_timebase.num = 1;
@@ -238,7 +241,7 @@ int VP8EncoderImpl::InitEncode(const VideoCodec* inst,
   config_->rc_resize_allowed = inst->codecSpecific.VP8.automaticResizeOn ?
       1 : 0;
   config_->rc_min_quantizer = 2;
-  config_->rc_max_quantizer = 56;
+  config_->rc_max_quantizer = inst->qpMax;
   config_->rc_undershoot_pct = 100;
   config_->rc_overshoot_pct = 15;
   config_->rc_buf_initial_sz = 500;
@@ -251,9 +254,11 @@ int VP8EncoderImpl::InitEncode(const VideoCodec* inst,
     // Disable periodic key frames if we get feedback from the decoder
     // through SLI and RPSI.
     config_->kf_mode = VPX_KF_DISABLED;
-  } else {
+  } else if (inst->codecSpecific.VP8.keyFrameInterval  > 0) {
     config_->kf_mode = VPX_KF_AUTO;
-    config_->kf_max_dist = 3000;
+    config_->kf_max_dist = inst->codecSpecific.VP8.keyFrameInterval;
+  } else {
+    config_->kf_mode = VPX_KF_DISABLED;
   }
   switch (inst->codecSpecific.VP8.complexity) {
     case kComplexityHigh:
@@ -362,7 +367,7 @@ int VP8EncoderImpl::Encode(const I420VideoFrame& input_image,
 
   int flags = 0;
 #if WEBRTC_LIBVPX_VERSION >= 971
-  flags |= temporal_layers_->EncodeFlags();
+  flags |= temporal_layers_->EncodeFlags(input_image.timestamp());
 #endif
   bool send_keyframe = (frame_type == kKeyFrame);
   if (send_keyframe) {

@@ -14,10 +14,16 @@
 
 #include <algorithm>
 
-#include "video_engine/test/auto_test/interface/vie_autotest.h"
-#include "video_engine/test/auto_test/interface/vie_autotest_defines.h"
-#include "video_engine/test/auto_test/primitives/choice_helpers.h"
-#include "video_engine/test/auto_test/primitives/input_helpers.h"
+#include "gflags/gflags.h"
+#include "webrtc/system_wrappers/interface/scoped_ptr.h"
+#include "webrtc/test/channel_transport/include/channel_transport.h"
+#include "webrtc/video_engine/test/auto_test/interface/vie_autotest.h"
+#include "webrtc/video_engine/test/auto_test/interface/vie_autotest_defines.h"
+#include "webrtc/video_engine/test/auto_test/primitives/choice_helpers.h"
+#include "webrtc/video_engine/test/auto_test/primitives/general_primitives.h"
+#include "webrtc/video_engine/test/auto_test/primitives/input_helpers.h"
+#include "webrtc/video_engine/test/libvietest/include/vie_to_file_renderer.h"
+#include "webrtc/voice_engine/include/voe_network.h"
 
 #define VCM_RED_PAYLOAD_TYPE                            96
 #define VCM_ULPFEC_PAYLOAD_TYPE                         97
@@ -36,6 +42,11 @@
 #define DEFAULT_VIDEO_CODEC_MAX_FRAMERATE               "30"
 #define DEFAULT_VIDEO_PROTECTION_METHOD                 "None"
 #define DEFAULT_TEMPORAL_LAYER                          "0"
+#define DEFAULT_BUFFERING_DELAY_MS                      "0"
+
+DEFINE_string(render_custom_call_remote_to, "", "Specify to render the remote "
+    "stream of a custom call to the provided filename instead of showing it in "
+    "window 2. The file will end up in the default output directory (out/).");
 
 enum StatisticsType {
   kSendStatistic,
@@ -146,6 +157,7 @@ bool SetVideoProtection(webrtc::ViECodec* vie_codec,
                         int video_channel,
                         VideoProtectionMethod protection_method);
 bool GetBitrateSignaling();
+int GetBufferingDelay();
 
 // The following are audio helper functions.
 bool GetAudioDevices(webrtc::VoEBase* voe_base,
@@ -190,6 +202,12 @@ int ViEAutoTest::ViECustomCall() {
   webrtc::VoEHardware* voe_hardware =
       webrtc::VoEHardware::GetInterface(voe);
   number_of_errors += ViETest::TestError(voe_hardware != NULL,
+                                         "ERROR: %s at line %d", __FUNCTION__,
+                                         __LINE__);
+
+  webrtc::VoENetwork* voe_network=
+      webrtc::VoENetwork::GetInterface(voe);
+  number_of_errors += ViETest::TestError(voe_network != NULL,
                                          "ERROR: %s at line %d", __FUNCTION__,
                                          __LINE__);
 
@@ -258,8 +276,13 @@ int ViEAutoTest::ViECustomCall() {
   webrtc::CodecInst audio_codec;
   int audio_channel = -1;
   VideoProtectionMethod protection_method = kProtectionMethodNone;
+  int buffer_delay_ms = 0;
   bool is_image_scale_enabled = false;
   bool remb = true;
+  webrtc::scoped_ptr<webrtc::test::VideoChannelTransport>
+      video_channel_transport;
+  webrtc::scoped_ptr<webrtc::test::VoiceChannelTransport>
+      voice_channel_transport;
 
   while (!start_call) {
     // Get the IP address to use from call.
@@ -289,6 +312,9 @@ int ViEAutoTest::ViECustomCall() {
 
     // Get the video protection method for the call.
     protection_method = GetVideoProtection();
+
+    // Get the call mode (Real-Time/Buffered).
+    buffer_delay_ms = GetBufferingDelay();
 
     // Get the audio device for the call.
     memset(audio_capture_device_name, 0, KMaxUniqueIdLength);
@@ -327,13 +353,17 @@ int ViEAutoTest::ViECustomCall() {
   if (start_call == true) {
     // Configure audio channel first.
     audio_channel = voe_base->CreateChannel();
-    error = voe_base->SetSendDestination(audio_channel, audio_tx_port,
-                                         ip_address.c_str());
+
+    voice_channel_transport.reset(
+        new webrtc::test::VoiceChannelTransport(voe_network, audio_channel));
+
+    error = voice_channel_transport->SetSendDestination(ip_address.c_str(),
+                                                        audio_tx_port);
     number_of_errors += ViETest::TestError(error == 0,
                                            "ERROR: %s at line %d",
                                            __FUNCTION__, __LINE__);
 
-    error = voe_base->SetLocalReceiver(audio_channel, audio_rx_port);
+    error = voice_channel_transport->SetLocalReceiver(audio_rx_port);
     number_of_errors += ViETest::TestError(error == 0,
                                            "ERROR: %s at line %d",
                                            __FUNCTION__, __LINE__);
@@ -442,18 +472,34 @@ int ViEAutoTest::ViECustomCall() {
                                            "ERROR: %s at line %d",
                                            __FUNCTION__, __LINE__);
 
-    error = vie_renderer->AddRenderer(video_channel, _window2, 1, 0.0, 0.0, 1.0,
-                                      1.0);
-    number_of_errors += ViETest::TestError(error == 0,
-                                           "ERROR: %s at line %d",
-                                           __FUNCTION__, __LINE__);
-    error = vie_network->SetSendDestination(video_channel, ip_address.c_str(),
-                                                video_tx_port);
+
+    ViEToFileRenderer file_renderer;
+    if (FLAGS_render_custom_call_remote_to == "") {
+      error = vie_renderer->AddRenderer(video_channel, _window2, 1, 0.0, 0.0,
+                                        1.0, 1.0);
+      number_of_errors += ViETest::TestError(error == 0,
+                                             "ERROR: %s at line %d",
+                                             __FUNCTION__, __LINE__);
+    } else {
+      std::string output_path = ViETest::GetResultOutputPath();
+      std::string filename = FLAGS_render_custom_call_remote_to;
+      ViETest::Log("Rendering remote stream to %s: you will not see any output "
+          "in the second window.", (output_path + filename).c_str());
+
+      file_renderer.PrepareForRendering(output_path, filename);
+      RenderToFile(vie_renderer, video_channel, &file_renderer);
+    }
+
+    video_channel_transport.reset(
+        new webrtc::test::VideoChannelTransport(vie_network, video_channel));
+
+    error = video_channel_transport->SetSendDestination(ip_address.c_str(),
+                                                        video_tx_port);
     number_of_errors += ViETest::TestError(error == 0,
                                            "ERROR: %s at line %d",
                                            __FUNCTION__, __LINE__);
 
-    error = vie_network->SetLocalReceiver(video_channel, video_rx_port);
+    error = video_channel_transport->SetLocalReceiver(video_rx_port);
     number_of_errors += ViETest::TestError(error == 0,
                                            "ERROR: %s at line %d",
                                            __FUNCTION__, __LINE__);
@@ -466,6 +512,16 @@ int ViEAutoTest::ViECustomCall() {
     error = vie_codec->SetReceiveCodec(video_channel, video_send_codec);
     number_of_errors += ViETest::TestError(error == 0,
                                            "ERROR: %s at line %d",
+                                           __FUNCTION__, __LINE__);
+
+    // Set the call mode (conferencing/buffering)
+    error = vie_rtp_rtcp->SetSenderBufferingMode(video_channel,
+                                                    buffer_delay_ms);
+    number_of_errors += ViETest::TestError(error == 0, "ERROR: %s at line %d",
+                                           __FUNCTION__, __LINE__);
+    error = vie_rtp_rtcp->SetReceiverBufferingMode(video_channel,
+                                                      buffer_delay_ms);
+    number_of_errors += ViETest::TestError(error == 0, "ERROR: %s at line %d",
                                            __FUNCTION__, __LINE__);
     // Set the Video Protection before start send and receive.
     SetVideoProtection(vie_codec, vie_rtp_rtcp,
@@ -524,8 +580,12 @@ int ViEAutoTest::ViECustomCall() {
     int selection = FromChoices(
         "And now?",
         "Stop the call\n"
-        "Modify the call\n").Choose();
-
+        "Modify the call\n"
+        "Keep the call running indefinitely\n")
+            .WithDefault("Keep the call running indefinitely").Choose();
+    if (selection == 3) {
+        AutoTestSleep(std::numeric_limits<long>::max());
+    }
     int file_selection = 0;
 
     while (selection == 2) {
@@ -651,6 +711,11 @@ int ViEAutoTest::ViECustomCall() {
           number_of_errors += ViETest::TestError(error == 0,
                                                  "ERROR: %s at line %d",
                                                  __FUNCTION__, __LINE__);
+
+          assert(FLAGS_render_custom_call_remote_to == "" &&
+                 "Not implemented to change video capture device when "
+                 "rendering to file!");
+
           error = vie_capture->StartCapture(capture_id);
           number_of_errors += ViETest::TestError(error == 0,
                                                  "ERROR: %s at line %d",
@@ -846,6 +911,9 @@ int ViEAutoTest::ViECustomCall() {
       }
     }
 
+    if (FLAGS_render_custom_call_remote_to != "")
+      file_renderer.StopRendering();
+
     // Testing finished. Tear down Voice and Video Engine.
     // Tear down the VoE first.
     error = voe_base->StopReceive(audio_channel);
@@ -864,6 +932,9 @@ int ViEAutoTest::ViECustomCall() {
                                            __FUNCTION__, __LINE__);
     // Now tear down the ViE engine.
     error = vie_base->DisconnectAudioChannel(video_channel);
+
+    voice_channel_transport.reset(NULL);
+    video_channel_transport.reset(NULL);
 
     // If Encoder/Decoder Observer is running, delete them.
     if (codec_encoder_observer) {
@@ -1522,6 +1593,15 @@ bool GetBitrateSignaling() {
           .WithDefault("REMB")
           .Choose();
   return choice == 1;
+}
+
+int GetBufferingDelay() {
+  std::string input = TypedInput("Choose buffering delay (mS).")
+      .WithDefault(DEFAULT_BUFFERING_DELAY_MS)
+      .WithInputValidator(new webrtc::IntegerWithinRangeValidator(0, 10000))
+      .AskForInput();
+  std::string delay_ms = input;
+  return atoi(delay_ms.c_str());
 }
 
 void PrintRTCCPStatistics(webrtc::ViERTP_RTCP* vie_rtp_rtcp,

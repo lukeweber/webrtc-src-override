@@ -76,14 +76,13 @@ WebRtc_Word32 AudioCoder::Decode(AudioFrame& decodedAudio,
             return -1;
         }
     }
-    return _acm->PlayoutData10Ms((WebRtc_UWord16)sampFreqHz,
-				 (AudioFrame&)decodedAudio);
+    return _acm->PlayoutData10Ms((WebRtc_UWord16)sampFreqHz, &decodedAudio);
 }
 
 WebRtc_Word32 AudioCoder::PlayoutData(AudioFrame& decodedAudio,
 				      WebRtc_UWord16& sampFreqHz)
 {
-    return _acm->PlayoutData10Ms(sampFreqHz, (AudioFrame&)decodedAudio);
+    return _acm->PlayoutData10Ms(sampFreqHz, &decodedAudio);
 }
 
 WebRtc_Word32 AudioCoder::Encode(const AudioFrame& audio,
@@ -92,7 +91,8 @@ WebRtc_Word32 AudioCoder::Encode(const AudioFrame& audio,
 {
     // Fake a timestamp in case audio doesn't contain a correct timestamp.
     // Make a local copy of the audio frame since audio is const
-    AudioFrame audioFrame = audio;
+    AudioFrame audioFrame;
+    audioFrame.CopyFrom(audio);
     audioFrame.timestamp_ = _encodeTimestamp;
     _encodeTimestamp += audioFrame.samples_per_channel_;
 

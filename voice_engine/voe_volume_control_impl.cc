@@ -29,7 +29,7 @@ VoEVolumeControl* VoEVolumeControl::GetInterface(VoiceEngine* voiceEngine)
     {
         return NULL;
     }
-    VoiceEngineImpl* s = reinterpret_cast<VoiceEngineImpl*>(voiceEngine);
+    VoiceEngineImpl* s = static_cast<VoiceEngineImpl*>(voiceEngine);
     s->AddRef();
     return s;
 #endif
@@ -491,7 +491,6 @@ int VoEVolumeControlImpl::SetChannelOutputVolumeScaling(int channel,
     WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
                "SetChannelOutputVolumeScaling(channel=%d, scaling=%3.2f)",
                channel, scaling);
-    IPHONE_NOT_SUPPORTED(_shared->statistics());
     if (!_shared->statistics().Initialized())
     {
         _shared->SetLastError(VE_NOT_INITED, kTraceError);
@@ -520,7 +519,6 @@ int VoEVolumeControlImpl::GetChannelOutputVolumeScaling(int channel,
 {
     WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
                "GetChannelOutputVolumeScaling(channel=%d, scaling=?)", channel);
-    IPHONE_NOT_SUPPORTED(_shared->statistics());
     if (!_shared->statistics().Initialized())
     {
         _shared->SetLastError(VE_NOT_INITED, kTraceError);

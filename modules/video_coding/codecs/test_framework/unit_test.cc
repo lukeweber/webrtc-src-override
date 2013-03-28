@@ -220,6 +220,7 @@ UnitTest::Setup()
     _inst.maxBitrate = 4000;
     _inst.width = _source->GetWidth();
     _inst.height = _source->GetHeight();
+    _inst.qpMax = 56;
     _inst.codecSpecific.VP8.denoisingOn = true;
 
     // Get input frame.
@@ -255,6 +256,9 @@ UnitTest::Setup()
 
     unsigned int frameLength = 0;
     int i=0;
+    _inputVideoBuffer.CreateEmptyFrame(_inst.width, _inst.height, _inst.width,
+                                       (_inst.width + 1) / 2,
+                                       (_inst.width + 1) / 2);
     while (frameLength == 0)
     {
         if (i > 0)
@@ -262,13 +266,8 @@ UnitTest::Setup()
             // Insert yet another frame
             ASSERT_TRUE(fread(_refFrame, 1, _lengthSourceFrame,
                 _sourceFile) == _lengthSourceFrame);
-            _inputVideoBuffer.CreateFrame(size_y, _refFrame,
-                                          size_uv, _refFrame + size_y,
-                                          size_uv, _refFrame + size_y + size_uv,
-                                          _inst.width, _inst.height,
-                                          _inst.width,
-                                          (_inst.width + 1) / 2,
-                                          (_inst.width + 1) / 2);
+            EXPECT_EQ(0, ConvertToI420(kI420, _refFrame, 0, 0, _width, _height,
+                          0, kRotateNone, &_inputVideoBuffer));
             _encoder->Encode(_inputVideoBuffer, NULL, NULL);
             ASSERT_TRUE(WaitForEncodedFrame() > 0);
         }
@@ -721,12 +720,15 @@ UnitTest::RateControlTests()
 
     // Do not specify maxBitRate (as in ViE).
     _inst.maxBitrate = 0;
-    //-- Verify rate control --
+    // Verify rate control. For this test turn on codec frame dropper.
+    // At least one other test (BasicUnitTest) assumes frame dropper off, so
+    // for now we only set frame dropper on for this (rate control) test.
+    _inst.codecSpecific.VP8.frameDroppingOn = true;
     EXPECT_TRUE(_encoder->InitEncode(&_inst, 1, 1440) == WEBRTC_VIDEO_CODEC_OK);
     EXPECT_TRUE(_decoder->Reset() == WEBRTC_VIDEO_CODEC_OK);
     EXPECT_TRUE(_decoder->InitDecode(&_inst, 1) == WEBRTC_VIDEO_CODEC_OK);
     // add: should also be 0, and 1
-    const int bitRate[] = {30, 100, 500, 1000, 2000};
+    const int bitRate[] = {50, 100, 500, 1000, 2000};
     const int nBitrates = sizeof(bitRate)/sizeof(*bitRate);
 
     printf("\nRate control test\n");
@@ -779,11 +781,8 @@ UnitTest::RateControlTests()
         printf("Target bitrate: %d kbps, actual bitrate: %d kbps\n", _bitRate,
             actualBitrate);
         // Test for close match over reasonable range.
-        if (_bitRate >= 100 && _bitRate <= 2500)
-        {
-            EXPECT_TRUE(abs(WebRtc_Word32(actualBitrate - _bitRate)) <
-                0.12 * _bitRate); // for VP8
-        }
+          EXPECT_TRUE(abs(WebRtc_Word32(actualBitrate - _bitRate)) <
+                      0.12 * _bitRate);
         ASSERT_TRUE(feof(_sourceFile) != 0);
         rewind(_sourceFile);
     }

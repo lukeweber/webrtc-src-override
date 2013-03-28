@@ -23,6 +23,7 @@
 #include "modules/video_coding/main/source/nack_fec_tables.h"
 
 namespace webrtc {
+namespace media_optimization {
 
 VCMProtectionMethod::VCMProtectionMethod():
 _effectivePacketLoss(0),
@@ -309,8 +310,10 @@ VCMFecMethod::AvgRecoveryFEC(const VCMProtectionParameters* parameters) const
     const float protectionFactor = static_cast<float>(_protectionFactorD) /
                                                       255.0;
 
+    // Round down for estimated #FEC packets/frame, to keep
+    // |fecPacketsPerFrame| <= |sourcePacketsPerFrame|.
     WebRtc_UWord8 fecPacketsPerFrame = static_cast<WebRtc_UWord8>
-                                      (0.5 + protectionFactor * avgTotPackets);
+                                      (protectionFactor * avgTotPackets);
 
     WebRtc_UWord8 sourcePacketsPerFrame = avgTotPackets - fecPacketsPerFrame;
 
@@ -950,4 +953,5 @@ VCMLossProtectionLogic::Release()
     _selectedMethod = NULL;
 }
 
-}
+}  // namespace media_optimization
+}  // namespace webrtc

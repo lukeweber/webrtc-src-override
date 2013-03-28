@@ -157,7 +157,7 @@ class RTPSendCompleteCallback: public Transport
 {
 public:
     // Constructor input: (receive side) rtp module to send encoded data to
-    RTPSendCompleteCallback(TickTimeBase* clock,
+    RTPSendCompleteCallback(Clock* clock,
                             const char* filename = NULL);
     virtual ~RTPSendCompleteCallback();
 
@@ -186,7 +186,7 @@ protected:
     // Random uniform loss model
     bool UnifomLoss(double lossPct);
 
-    TickTimeBase*           _clock;
+    Clock*                  _clock;
     WebRtc_UWord32          _sendCount;
     RtpRtcp*                _rtp;
     double                  _lossPct;
@@ -223,12 +223,14 @@ public:
 class SendStatsTest: public webrtc::VCMSendStatisticsCallback
 {
 public:
-    SendStatsTest() : _frameRate(15) {}
+    SendStatsTest() : _framerate(15), _bitrate(500) {}
     WebRtc_Word32 SendStatistics(const WebRtc_UWord32 bitRate,
             const WebRtc_UWord32 frameRate);
-    void SetTargetFrameRate(WebRtc_UWord32 frameRate) {_frameRate = frameRate;}
+    void set_framerate(WebRtc_UWord32 frameRate) {_framerate = frameRate;}
+    void set_bitrate(uint32_t bitrate) {_bitrate = bitrate;}
 private:
-    WebRtc_UWord32 _frameRate;
+    WebRtc_UWord32 _framerate;
+    uint32_t _bitrate;
 };
 
 // Protection callback - allows the VCM (media optimization) to inform the RTP

@@ -8,21 +8,16 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
+#include "webrtc/modules/rtp_rtcp/test/testAPI/test_api.h"
+
 #include <algorithm>
 #include <vector>
-#include <gtest/gtest.h>
-
-#include "test_api.h"
-
-#include "common_types.h"
-#include "rtp_rtcp.h"
-#include "rtp_rtcp_defines.h"
 
 using namespace webrtc;
 
 class RtpRtcpAPITest : public ::testing::Test {
  protected:
-  RtpRtcpAPITest() {
+  RtpRtcpAPITest() : module(NULL), fake_clock(123456) {
     test_CSRC[0] = 1234;
     test_CSRC[1] = 2345;
     test_id = 123;
@@ -50,7 +45,7 @@ class RtpRtcpAPITest : public ::testing::Test {
   WebRtc_UWord32 test_timestamp;
   WebRtc_UWord16 test_sequence_number;
   WebRtc_UWord32 test_CSRC[webrtc::kRtpCsrcSize];
-  FakeRtpRtcpClock fake_clock;
+  SimulatedClock fake_clock;
 };
 
 TEST_F(RtpRtcpAPITest, Basic) {
@@ -109,6 +104,31 @@ TEST_F(RtpRtcpAPITest, RTCP) {
   EXPECT_FALSE(module->TMMBR());
 
   EXPECT_EQ(kNackOff, module->NACK());
-  EXPECT_EQ(0, module->SetNACKStatus(kNackRtcp));
+  EXPECT_EQ(0, module->SetNACKStatus(kNackRtcp, 450));
   EXPECT_EQ(kNackRtcp, module->NACK());
+}
+
+TEST_F(RtpRtcpAPITest, RTXSender) {
+  unsigned int ssrc = 0;
+  RtxMode rtx_mode = kRtxOff;
+  EXPECT_EQ(0, module->SetRTXSendStatus(kRtxRetransmitted, true, 1));
+  EXPECT_EQ(0, module->RTXSendStatus(&rtx_mode, &ssrc));
+  EXPECT_EQ(kRtxRetransmitted, rtx_mode);
+  EXPECT_EQ(1u, ssrc);
+  rtx_mode = kRtxOff;
+  EXPECT_EQ(0, module->SetRTXSendStatus(kRtxOff, true, 0));
+  EXPECT_EQ(0, module->RTXSendStatus(&rtx_mode, &ssrc));
+  EXPECT_EQ(kRtxOff, rtx_mode);
+}
+
+TEST_F(RtpRtcpAPITest, RTXReceiver) {
+  bool enable = false;
+  unsigned int ssrc = 0;
+  EXPECT_EQ(0, module->SetRTXReceiveStatus(true, 1));
+  EXPECT_EQ(0, module->RTXReceiveStatus(&enable, &ssrc));
+  EXPECT_TRUE(enable);
+  EXPECT_EQ(1u, ssrc);
+  EXPECT_EQ(0, module->SetRTXReceiveStatus(false, 0));
+  EXPECT_EQ(0, module->RTXReceiveStatus(&enable, &ssrc));
+  EXPECT_FALSE(enable);
 }

@@ -13,9 +13,9 @@
 #include <cmath>
 
 #include "common_video/libyuv/include/webrtc_libyuv.h"
-#include "modules/video_coding/main/source/tick_time_base.h"
 #include "rtp_dump.h"
 #include "test_macros.h"
+#include "webrtc/system_wrappers/interface/clock.h"
 
 namespace webrtc {
 
@@ -204,7 +204,7 @@ VCMDecodeCompleteCallback::DecodedBytes()
     return _decodedBytes;
 }
 
-RTPSendCompleteCallback::RTPSendCompleteCallback(TickTimeBase* clock,
+RTPSendCompleteCallback::RTPSendCompleteCallback(Clock* clock,
                                                  const char* filename):
     _clock(clock),
     _sendCount(0),
@@ -258,7 +258,7 @@ RTPSendCompleteCallback::SendPacket(int channel, const void *data, int len)
     bool transmitPacket = true;
     transmitPacket = PacketLoss();
 
-    WebRtc_UWord64 now = _clock->MillisecondTimestamp();
+    int64_t now = _clock->TimeInMilliseconds();
     // Insert outgoing packet into list
     if (transmitPacket)
     {
@@ -408,8 +408,8 @@ WebRtc_Word32
 SendStatsTest::SendStatistics(const WebRtc_UWord32 bitRate,
                               const WebRtc_UWord32 frameRate)
 {
-    TEST(frameRate <= _frameRate);
-    TEST(bitRate > 0 && bitRate < 100000);
+    TEST(frameRate <= _framerate);
+    TEST(bitRate > _bitrate / 2 && bitRate < 3 * _bitrate / 2);
     printf("VCM 1 sec: Bit rate: %u\tFrame rate: %u\n", bitRate, frameRate);
     return 0;
 }

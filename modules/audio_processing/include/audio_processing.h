@@ -16,6 +16,8 @@
 #include "webrtc/modules/interface/module.h"
 #include "webrtc/typedefs.h"
 
+struct AecCore;
+
 namespace webrtc {
 
 class AudioFrame;
@@ -285,8 +287,8 @@ class EchoCancellation {
 
   // Sets the difference between the number of samples rendered and captured by
   // the audio devices since the last call to |ProcessStream()|. Must be called
-  // if and only if drift compensation is enabled, prior to |ProcessStream()|.
-  virtual int set_stream_drift_samples(int drift) = 0;
+  // if drift compensation is enabled, prior to |ProcessStream()|.
+  virtual void set_stream_drift_samples(int drift) = 0;
   virtual int stream_drift_samples() const = 0;
 
   enum SuppressionLevel {
@@ -341,6 +343,12 @@ class EchoCancellation {
   // deviation |std|. The values are averaged over the time period since the
   // last call to |GetDelayMetrics()|.
   virtual int GetDelayMetrics(int* median, int* std) = 0;
+
+  // Returns a pointer to the low level AEC component.  In case of multiple
+  // channels, the pointer to the first one is returned.  A NULL pointer is
+  // returned when the AEC component is disabled or has not been initialized
+  // successfully.
+  virtual struct AecCore* aec_core() const = 0;
 
  protected:
   virtual ~EchoCancellation() {}

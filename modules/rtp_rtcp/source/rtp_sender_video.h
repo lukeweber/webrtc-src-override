@@ -22,7 +22,7 @@
 
 #include "video_codec_information.h"
 #include "forward_error_correction.h"
-#include "Bitrate.h"
+#include "bitrate.h"
 #include "rtp_sender.h"
 #include "producer_fec.h"
 
@@ -33,7 +33,7 @@ struct RtpPacket;
 class RTPSenderVideo
 {
 public:
-    RTPSenderVideo(const WebRtc_Word32 id, RtpRtcpClock* clock,
+    RTPSenderVideo(const WebRtc_Word32 id, Clock* clock,
                    RTPSenderInterface* rtpSender);
     virtual ~RTPSenderVideo();
 
@@ -97,11 +97,11 @@ protected:
                                           bool protect);
 
 private:
-    WebRtc_Word32 SendGeneric(const WebRtc_Word8 payloadType,
-                            const uint32_t captureTimeStamp,
-                            int64_t capture_time_ms,
-                            const WebRtc_UWord8* payloadData,
-                            const WebRtc_UWord32 payloadSize);
+    WebRtc_Word32 SendGeneric(const FrameType frame_type,
+                              const int8_t payload_type,
+                              const uint32_t capture_timestamp,
+                              int64_t capture_time_ms,
+                              const uint8_t* payload, const uint32_t size);
 
     WebRtc_Word32 SendVP8(const FrameType frameType,
                         const WebRtc_Word8 payloadType,

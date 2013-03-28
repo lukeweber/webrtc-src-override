@@ -225,7 +225,7 @@ private:
 
     WebRtc_Word32 _id;
 
-    AudioUnit _auRemoteIO;
+    AudioUnit _auVoiceProcessing;
 
 private:
     bool _initialized;

@@ -124,12 +124,14 @@ int ViECodecImpl::SetSendCodec(const int video_channel,
     WEBRTC_TRACE(kTraceInfo, kTraceVideo,
                  ViEId(shared_data_->instance_id(), video_channel),
                  "pictureLossIndicationOn: %d, feedbackModeOn: %d, "
-                 "complexity: %d, resilience: %d, numberOfTemporalLayers: %u",
+                 "complexity: %d, resilience: %d, numberOfTemporalLayers: %u"
+                 "keyFrameInterval %d",
                  video_codec.codecSpecific.VP8.pictureLossIndicationOn,
                  video_codec.codecSpecific.VP8.feedbackModeOn,
                  video_codec.codecSpecific.VP8.complexity,
                  video_codec.codecSpecific.VP8.resilience,
-                 video_codec.codecSpecific.VP8.numberOfTemporalLayers);
+                 video_codec.codecSpecific.VP8.numberOfTemporalLayers,
+                 video_codec.codecSpecific.VP8.keyFrameInterval);
   }
   if (!CodecValid(video_codec)) {
     // Error logged.
@@ -156,7 +158,6 @@ int ViECodecImpl::SetSendCodec(const int video_channel,
     shared_data_->SetLastError(kViECodecReceiveOnlyChannel);
     return -1;
   }
-
   // Set a max_bitrate if the user hasn't set one.
   VideoCodec video_codec_internal;
   memcpy(&video_codec_internal, &video_codec, sizeof(VideoCodec));
@@ -738,9 +739,11 @@ bool ViECodecImpl::CodecValid(const VideoCodec& video_codec) {
                  "Codec type doesn't match pl_name", video_codec.plType);
     return false;
   } else if ((video_codec.codecType == kVideoCodecVP8 &&
-                  strncmp(video_codec.plName, "VP8", 4) == 0) ||
-              (video_codec.codecType == kVideoCodecI420 &&
-                  strncmp(video_codec.plName, "I420", 4) == 0)) {
+              strncmp(video_codec.plName, "VP8", 4) == 0) ||
+             (video_codec.codecType == kVideoCodecI420 &&
+              strncmp(video_codec.plName, "I420", 4) == 0) ||
+             (video_codec.codecType == kVideoCodecGeneric &&
+              strncmp(video_codec.plName, "GENERIC", 7) == 0)) {
     // OK.
   } else {
     WEBRTC_TRACE(kTraceError, kTraceVideo, -1,
@@ -748,7 +751,7 @@ bool ViECodecImpl::CodecValid(const VideoCodec& video_codec) {
     return false;
   }
 
-  if (video_codec.plType == 0 && video_codec.plType > 127) {
+  if (video_codec.plType == 0 || video_codec.plType > 127) {
     WEBRTC_TRACE(kTraceError, kTraceVideo, -1,
                  "Invalid codec payload type: %d", video_codec.plType);
     return false;

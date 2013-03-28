@@ -8,30 +8,30 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "quality_modes_test.h"
+#include "webrtc/modules/video_coding/main/test/quality_modes_test.h"
 
 #include <time.h>
 #include <iostream>
 #include <string>
 #include <sstream>
 
-#include "common_video/libyuv/include/webrtc_libyuv.h"
-#include "modules/video_coding/main/source/event.h"
-#include "modules/video_coding/main/source/mock/fake_tick_time.h"
-#include "modules/video_coding/main/source/tick_time_base.h"
-#include "modules/video_coding/main/test/test_callbacks.h"
-#include "modules/video_coding/main/test/test_macros.h"
-#include "modules/video_coding/main/test/test_util.h"
-#include "system_wrappers/interface/data_log.h"
-#include "system_wrappers/interface/data_log.h"
-#include "testsupport/metrics/video_metrics.h"
+#include "webrtc/common_video/libyuv/include/webrtc_libyuv.h"
+#include "webrtc/modules/video_coding/main/interface/video_coding.h"
+#include "webrtc/modules/video_coding/main/test/test_callbacks.h"
+#include "webrtc/modules/video_coding/main/test/test_macros.h"
+#include "webrtc/modules/video_coding/main/test/test_util.h"
+#include "webrtc/system_wrappers/interface/clock.h"
+#include "webrtc/system_wrappers/interface/data_log.h"
+#include "webrtc/system_wrappers/interface/data_log.h"
+#include "webrtc/test/testsupport/metrics/video_metrics.h"
 
 using namespace webrtc;
 
 int qualityModeTest(const CmdArgs& args)
 {
-  FakeTickTime clock(0);
-  VideoCodingModule* vcm = VideoCodingModule::Create(1, &clock);
+  SimulatedClock clock(0);
+  NullEventFactory event_factory;
+  VideoCodingModule* vcm = VideoCodingModule::Create(1, &clock, &event_factory);
   QualityModesTest QMTest(vcm, &clock);
   QMTest.Perform(args);
   VideoCodingModule::Destroy(vcm);
@@ -39,7 +39,7 @@ int qualityModeTest(const CmdArgs& args)
 }
 
 QualityModesTest::QualityModesTest(VideoCodingModule* vcm,
-                                   TickTimeBase* clock):
+                                   Clock* clock):
 NormalTest(vcm, clock),
 _vpm()
 {
@@ -239,10 +239,11 @@ QualityModesTest::Perform(const CmdArgs& args)
   I420VideoFrame *decimatedFrame = NULL;
   WebRtc_UWord8* tmpBuffer = new WebRtc_UWord8[_lengthSourceFrame];
   double startTime = clock()/(double)CLOCKS_PER_SEC;
-  _vcm->SetChannelParameters((WebRtc_UWord32)_bitRate, 0, 0);
+  _vcm->SetChannelParameters(static_cast<uint32_t>(1000 * _bitRate), 0, 0);
 
   SendStatsTest sendStats;
-  sendStats.SetTargetFrameRate(static_cast<WebRtc_UWord32>(_frameRate));
+  sendStats.set_framerate(static_cast<WebRtc_UWord32>(_frameRate));
+  sendStats.set_bitrate(1000 * _bitRate);
   _vcm->RegisterSendStatisticsCallback(&sendStats);
 
   VideoContentMetrics* contentMetrics = NULL;
@@ -334,7 +335,8 @@ QualityModesTest::Perform(const CmdArgs& args)
       // this will trigger QMSelect
       if (_frameCnt%((int)_frameRate) == 0)
       {
-        _vcm->SetChannelParameters((WebRtc_UWord32)_bitRate, 0, 1);
+        _vcm->SetChannelParameters(static_cast<uint32_t>(1000 * _bitRate), 0,
+                                   1);
       }
 
       // check for bit rate update
@@ -367,8 +369,8 @@ QualityModesTest::Perform(const CmdArgs& args)
       DataLog::InsertCell(feature_table_name_, "frame rate", _nativeFrameRate);
       DataLog::NextRow(feature_table_name_);
 
-      static_cast<FakeTickTime*>(
-          _clock)->IncrementDebugClock(1000 / _nativeFrameRate);
+      static_cast<SimulatedClock*>(_clock)->AdvanceTimeMilliseconds(
+          1000 / _nativeFrameRate);
   }
 
   } while (feof(_sourceFile) == 0);

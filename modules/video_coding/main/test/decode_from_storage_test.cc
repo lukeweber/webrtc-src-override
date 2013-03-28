@@ -8,13 +8,12 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "receiver_tests.h"
-#include "video_coding.h"
-#include "rtp_rtcp.h"
-#include "trace.h"
-#include "../source/event.h"
-#include "rtp_player.h"
-#include "modules/video_coding/main/source/mock/fake_tick_time.h"
+#include "webrtc/modules/rtp_rtcp/interface/rtp_rtcp.h"
+#include "webrtc/modules/video_coding/main/interface/video_coding.h"
+#include "webrtc/modules/video_coding/main/test/receiver_tests.h"
+#include "webrtc/modules/video_coding/main/test/rtp_player.h"
+#include "webrtc/system_wrappers/interface/clock.h"
+#include "webrtc/system_wrappers/interface/trace.h"
 
 using namespace webrtc;
 
@@ -35,12 +34,7 @@ private:
 
 int DecodeFromStorageTest(CmdArgs& args)
 {
-    // Make sure this test isn't executed without simulated events.
-#if !defined(EVENT_DEBUG)
-    return -1;
-#endif
     // BEGIN Settings
-
     bool protectionEnabled = false;
     VCMVideoProtection protectionMethod = kProtectionNack;
     WebRtc_UWord32 rttMS = 100;
@@ -64,10 +58,13 @@ int DecodeFromStorageTest(CmdArgs& args)
     Trace::SetLevelFilter(webrtc::kTraceAll);
 
 
-    FakeTickTime clock(0);
+    SimulatedClock clock(0);
+    NullEventFactory event_factory;
     // TODO(hlundin): This test was not verified after changing to FakeTickTime.
-    VideoCodingModule* vcm = VideoCodingModule::Create(1, &clock);
-    VideoCodingModule* vcmPlayback = VideoCodingModule::Create(2, &clock);
+    VideoCodingModule* vcm = VideoCodingModule::Create(1, &clock,
+                                                       &event_factory);
+    VideoCodingModule* vcmPlayback = VideoCodingModule::Create(2, &clock,
+                                                               &event_factory);
     FrameStorageCallback storageCallback(vcmPlayback);
     RtpDataCallback dataCallback(vcm);
     WebRtc_Word32 ret = vcm->InitializeReceiver();
@@ -125,9 +122,9 @@ int DecodeFromStorageTest(CmdArgs& args)
     ret = 0;
 
     // RTP stream main loop
-    while ((ret = rtpStream.NextPacket(clock.MillisecondTimestamp())) == 0)
+    while ((ret = rtpStream.NextPacket(clock.TimeInMilliseconds())) == 0)
     {
-        if (clock.MillisecondTimestamp() % 5 == 0)
+        if (clock.TimeInMilliseconds() % 5 == 0)
         {
             ret = vcm->Decode();
             if (ret < 0)
@@ -139,11 +136,11 @@ int DecodeFromStorageTest(CmdArgs& args)
         {
             vcm->Process();
         }
-        if (MAX_RUNTIME_MS > -1 && clock.MillisecondTimestamp() >= MAX_RUNTIME_MS)
+        if (MAX_RUNTIME_MS > -1 && clock.TimeInMilliseconds() >= MAX_RUNTIME_MS)
         {
             break;
         }
-        clock.IncrementDebugClock(1);
+        clock.AdvanceTimeMilliseconds(1);
     }
 
     switch (ret)

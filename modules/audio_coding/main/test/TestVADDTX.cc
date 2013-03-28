@@ -8,16 +8,17 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "TestVADDTX.h"
+#include "webrtc/modules/audio_coding/main/test/TestVADDTX.h"
 
 #include <iostream>
 
-#include "audio_coding_module_typedefs.h"
-#include "common_types.h"
-#include "engine_configurations.h"
-#include "testsupport/fileutils.h"
-#include "trace.h"
-#include "utility.h"
+#include "webrtc/common_types.h"
+#include "webrtc/engine_configurations.h"
+#include "webrtc/modules/audio_coding/main/interface/audio_coding_module_typedefs.h"
+#include "webrtc/modules/audio_coding/main/test/utility.h"
+#include "webrtc/modules/audio_coding/main/source/acm_common_defs.h"
+#include "webrtc/test/testsupport/fileutils.h"
+#include "webrtc/system_wrappers/interface/trace.h"
 
 namespace webrtc {
 
@@ -78,7 +79,7 @@ void TestVADDTX::Perform()
     }
     for(WebRtc_UWord8 n = 0; n < numEncoders; n++)
     {
-        _acmB->Codec(n, myCodecParam);
+        _acmB->Codec(n, &myCodecParam);
         if(_testMode != 0)
         {
             printf("%s\n", myCodecParam.plname);
@@ -174,7 +175,7 @@ void TestVADDTX::runTestCases()
     if(_testMode != 0)
     {
         CodecInst myCodecParam;
-        _acmA->SendCodec(myCodecParam);
+        _acmA->SendCodec(&myCodecParam);
         printf("%s\n", myCodecParam.plname);
     }
     else
@@ -239,7 +240,7 @@ void TestVADDTX::SetVAD(bool statusDTX, bool statusVAD, WebRtc_Word16 vadMode)
     if (_acmA->SetVAD(statusDTX, statusVAD, (ACMVADMode) vadMode) < 0) {
       assert(false);
     }
-    if (_acmA->VAD(dtxEnabled, vadEnabled, vadModeSet) < 0) {
+    if (_acmA->VAD(&dtxEnabled, &vadEnabled, &vadModeSet) < 0) {
       assert(false);
     }
 
@@ -282,7 +283,7 @@ VADDTXstruct TestVADDTX::GetVAD()
     bool dtxEnabled, vadEnabled;
     ACMVADMode vadModeSet;
 
-    if (_acmA->VAD(dtxEnabled, vadEnabled, vadModeSet) < 0) {
+    if (_acmA->VAD(&dtxEnabled, &vadEnabled, &vadModeSet) < 0) {
       assert(false);
     }
 
@@ -328,7 +329,7 @@ WebRtc_Word16 TestVADDTX::RegisterSendCodec(char side,
     for(WebRtc_Word16 codecCntr = 0; codecCntr < myACM->NumberOfCodecs();
         codecCntr++)
     {
-        CHECK_ERROR(myACM->Codec((WebRtc_UWord8)codecCntr, myCodecParam));
+        CHECK_ERROR(myACM->Codec((WebRtc_UWord8)codecCntr, &myCodecParam));
         if(!STR_CASE_CMP(myCodecParam.plname, codecName))
         {
             if((samplingFreqHz == -1) || (myCodecParam.plfreq == samplingFreqHz))
@@ -366,7 +367,7 @@ void TestVADDTX::Run()
 
         CHECK_ERROR(_acmA->Process());
 
-        CHECK_ERROR(_acmB->PlayoutData10Ms(outFreqHzB, audioFrame));
+        CHECK_ERROR(_acmB->PlayoutData10Ms(outFreqHzB, &audioFrame));
         _outFileB.Write10MsData(audioFrame.data_, audioFrame.samples_per_channel_);
     }
 #ifdef PRINT_STAT
@@ -399,7 +400,7 @@ WebRtc_Word16 TestVADDTX::VerifyTest()
     WebRtc_UWord8 vadPattern = 0;
     WebRtc_UWord8 emptyFramePattern[6];
     CodecInst myCodecParam;
-    _acmA->SendCodec(myCodecParam);
+    _acmA->SendCodec(&myCodecParam);
     bool dtxInUse = true;
     bool isReplaced = false;
     if ((STR_CASE_CMP(myCodecParam.plname,"G729") == 0) ||
@@ -408,7 +409,7 @@ WebRtc_Word16 TestVADDTX::VerifyTest()
         (STR_CASE_CMP(myCodecParam.plname,"AMR-wb") == 0) ||
         (STR_CASE_CMP(myCodecParam.plname,"speex") == 0))
     {
-        _acmA->IsInternalDTXReplacedWithWebRtc(isReplaced);
+        _acmA->IsInternalDTXReplacedWithWebRtc(&isReplaced);
         if (!isReplaced)
         {
             dtxInUse = false;

@@ -8,20 +8,19 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "common_video/libyuv/include/webrtc_libyuv.h"
-#include "receiver_tests.h"
-#include "video_coding.h"
-#include "rtp_rtcp.h"
-#include "trace.h"
-#include "../source/event.h"
-#include "../source/internal_defines.h"
-#include "test_macros.h"
-#include "rtp_player.h"
-#include "modules/video_coding/main/source/mock/fake_tick_time.h"
-
 #include <stdio.h>
 #include <string.h>
 #include <sstream>
+
+#include "webrtc/common_video/libyuv/include/webrtc_libyuv.h"
+#include "webrtc/modules/rtp_rtcp/interface/rtp_rtcp.h"
+#include "webrtc/modules/video_coding/main/interface/video_coding.h"
+#include "webrtc/modules/video_coding/main/source/internal_defines.h"
+#include "webrtc/modules/video_coding/main/test/receiver_tests.h"
+#include "webrtc/modules/video_coding/main/test/test_macros.h"
+#include "webrtc/modules/video_coding/main/test/rtp_player.h"
+#include "webrtc/system_wrappers/interface/clock.h"
+#include "webrtc/system_wrappers/interface/trace.h"
 
 using namespace webrtc;
 
@@ -67,8 +66,9 @@ FrameReceiveCallback::FrameToRender(I420VideoFrame& videoFrame)
         printf("New size: %ux%u\n", videoFrame.width(), videoFrame.height());
         width_ = videoFrame.width();
         height_ = videoFrame.height();
-        std::string filename_with_width_height = AppendWidthAndHeight(
-            _outFilename, width_, height_);
+        std::string filename_with_width_height = AppendWidthHeightAndCount(
+            _outFilename, width_, height_, count_);
+        ++count_;
         _outFile = fopen(filename_with_width_height.c_str(), "wb");
         if (_outFile == NULL)
         {
@@ -98,24 +98,20 @@ void FrameReceiveCallback::SplitFilename(std::string filename,
       *ending = "";
   }
 }
-std::string FrameReceiveCallback::AppendWidthAndHeight(
-    std::string filename, unsigned int width, unsigned int height) {
+std::string FrameReceiveCallback::AppendWidthHeightAndCount(
+    std::string filename, unsigned int width, unsigned int height, int count) {
   std::string basename;
   std::string ending;
   SplitFilename(filename, &basename, &ending);
   std::stringstream ss;
-  ss << basename << "." <<  width << "_" << height << "." << ending;
+  ss << basename << "_" << count << "." <<  width << "_" << height << "." <<
+      ending;
   return ss.str();
 }
 
 int RtpPlay(CmdArgs& args)
 {
-    // Make sure this test isn't executed without simulated events.
-#if !defined(EVENT_DEBUG)
-    return -1;
-#endif
     // BEGIN Settings
-
     bool protectionEnabled = true;
     VCMVideoProtection protectionMethod = kProtectionNack;
     WebRtc_UWord32 rttMS = 0;
@@ -128,8 +124,10 @@ int RtpPlay(CmdArgs& args)
     if (outFile == "")
         outFile = test::OutputPath() + "RtpPlay_decoded.yuv";
     FrameReceiveCallback receiveCallback(outFile);
-    FakeTickTime clock(0);
-    VideoCodingModule* vcm = VideoCodingModule::Create(1, &clock);
+    SimulatedClock clock(0);
+    NullEventFactory event_factory;
+    VideoCodingModule* vcm = VideoCodingModule::Create(1, &clock,
+                                                       &event_factory);
     RtpDataCallback dataCallback(vcm);
     RTPPlayer rtpStream(args.inputFile.c_str(), &dataCallback, &clock);
 
@@ -192,13 +190,14 @@ int RtpPlay(CmdArgs& args)
     vcm->SetVideoProtection(protectionMethod, protectionEnabled);
     vcm->SetRenderDelay(renderDelayMs);
     vcm->SetMinimumPlayoutDelay(minPlayoutDelayMs);
+    vcm->SetNackSettings(kMaxNackListSize, kMaxPacketAgeToNack);
 
     ret = 0;
 
     // RTP stream main loop
-    while ((ret = rtpStream.NextPacket(clock.MillisecondTimestamp())) == 0)
+    while ((ret = rtpStream.NextPacket(clock.TimeInMilliseconds())) == 0)
     {
-        if (clock.MillisecondTimestamp() % 5 == 0)
+        if (clock.TimeInMilliseconds() % 5 == 0)
         {
             ret = vcm->Decode();
             if (ret < 0)
@@ -212,28 +211,13 @@ int RtpPlay(CmdArgs& args)
         {
             vcm->Process();
         }
-        if (MAX_RUNTIME_MS > -1 && clock.MillisecondTimestamp() >=
+        if (MAX_RUNTIME_MS > -1 && clock.TimeInMilliseconds() >=
             MAX_RUNTIME_MS)
         {
             break;
         }
-        clock.IncrementDebugClock(1);
+        clock.AdvanceTimeMilliseconds(1);
     }
-
-    switch (ret)
-    {
-    case 1:
-        printf("Success\n");
-        break;
-    case -1:
-        printf("Failed\n");
-        break;
-    case 0:
-        printf("Timeout\n");
-        break;
-    }
-
-    rtpStream.Print();
 
     // Tear down
     while (!payloadTypes.empty())
@@ -243,6 +227,20 @@ int RtpPlay(CmdArgs& args)
     }
     delete vcm;
     vcm = NULL;
+    rtpStream.Print();
     Trace::ReturnTrace();
+
+    switch (ret)
+    {
+    case 1:
+        printf("Success\n");
+        return 0;
+    case -1:
+        printf("Failed\n");
+        return -1;
+    case 0:
+        printf("Timeout\n");
+        return -1;
+    }
     return 0;
 }

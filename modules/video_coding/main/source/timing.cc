@@ -8,15 +8,17 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "trace.h"
-#include "internal_defines.h"
-#include "jitter_buffer_common.h"
-#include "timing.h"
-#include "timestamp_extrapolator.h"
+#include "webrtc/modules/video_coding/main/source/timing.h"
+
+#include "webrtc/modules/video_coding/main/source/internal_defines.h"
+#include "webrtc/modules/video_coding/main/source/jitter_buffer_common.h"
+#include "webrtc/modules/video_coding/main/source/timestamp_extrapolator.h"
+#include "webrtc/system_wrappers/interface/clock.h"
+#include "webrtc/system_wrappers/interface/trace.h"
 
 namespace webrtc {
 
-VCMTiming::VCMTiming(TickTimeBase* clock,
+VCMTiming::VCMTiming(Clock* clock,
                      WebRtc_Word32 vcmId,
                      WebRtc_Word32 timingId,
                      VCMTiming* masterTiming)
@@ -32,7 +34,8 @@ _renderDelayMs(kDefaultRenderDelayMs),
 _minTotalDelayMs(0),
 _requiredDelayMs(0),
 _currentDelayMs(0),
-_prevFrameTimestamp(0)
+_prevFrameTimestamp(0),
+_maxVideoDelayMs(kMaxVideoDelayMs)
 {
     if (masterTiming == NULL)
     {
@@ -129,7 +132,7 @@ void VCMTiming::UpdateCurrentDelay(WebRtc_UWord32 frameTimestamp)
         WebRtc_Word64 delayDiffMs = static_cast<WebRtc_Word64>(targetDelayMs) -
                                     _currentDelayMs;
         // Never change the delay with more than 100 ms every second. If we're changing the
-        // delay in too large steps we will get noticable freezes. By limiting the change we
+        // delay in too large steps we will get noticeable freezes. By limiting the change we
         // can increase the delay in smaller steps, which will be experienced as the video is
         // played in slow motion. When lowering the delay the video will be played at a faster
         // pace.
@@ -247,7 +250,7 @@ VCMTiming::RenderTimeMsInternal(WebRtc_UWord32 frameTimestamp, WebRtc_Word64 now
 {
     WebRtc_Word64 estimatedCompleteTimeMs =
             _tsExtrapolator->ExtrapolateLocalTime(frameTimestamp);
-    if (estimatedCompleteTimeMs - nowMs > kMaxVideoDelayMs)
+    if (estimatedCompleteTimeMs - nowMs > _maxVideoDelayMs)
     {
         if (_master)
         {
@@ -319,6 +322,12 @@ VCMTiming::EnoughTimeToDecode(WebRtc_UWord32 availableProcessingTimeMs) const
         maxDecodeTimeMs = 1;
     }
     return static_cast<WebRtc_Word32>(availableProcessingTimeMs) - maxDecodeTimeMs > 0;
+}
+
+void VCMTiming::SetMaxVideoDelay(int maxVideoDelayMs)
+{
+    CriticalSectionScoped cs(_critSect);
+    _maxVideoDelayMs = maxVideoDelayMs;
 }
 
 WebRtc_UWord32

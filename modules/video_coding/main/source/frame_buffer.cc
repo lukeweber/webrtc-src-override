@@ -204,21 +204,6 @@ VCMFrameBuffer::LatestPacketTimeMs() const
     return _latestPacketTimeMs;
 }
 
-// Build hard NACK list:Zero out all entries in list up to and including the
-// (first) entry equal to _lowSeqNum.
-int VCMFrameBuffer::BuildHardNackList(int* list, int num) {
-  if (_sessionInfo.BuildHardNackList(list, num) != 0) {
-   return -1;
-  }
-  return 0;
-}
-
-// Build selective NACK list: Create a soft (selective) list of entries to zero
-// out up to and including the (first) entry equal to _lowSeqNum.
-int VCMFrameBuffer::BuildSoftNackList(int* list, int num, int rttMs) {
-  return _sessionInfo.BuildSoftNackList(list, num, rttMs);
-}
-
 void
 VCMFrameBuffer::IncrementNackCount()
 {

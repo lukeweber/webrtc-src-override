@@ -31,6 +31,7 @@
 
 namespace webrtc {
 
+class CallStatsObserver;
 class ChannelStatsObserver;
 class CriticalSectionWrapper;
 class Encryption;
@@ -38,7 +39,6 @@ class PacedSender;
 class ProcessThread;
 class RtpRtcp;
 class RtcpRttObserver;
-class StatsObserver;
 class ThreadWrapper;
 class VideoCodingModule;
 class VideoDecoder;
@@ -116,6 +116,8 @@ class ViEChannel
   WebRtc_Word32 SetHybridNACKFECStatus(const bool enable,
                                        const unsigned char payload_typeRED,
                                        const unsigned char payload_typeFEC);
+  int SetSenderBufferingMode(int target_delay_ms);
+  int SetReceiverBufferingMode(int target_delay_ms);
   WebRtc_Word32 SetKeyFrameRequestMethod(const KeyFrameRequestMethod method);
   bool EnableRemb(bool enable);
   int SetSendTimestampOffsetStatus(bool enable, int id);
@@ -180,7 +182,7 @@ class ViEChannel
                          uint32_t* video_bitrate_sent,
                          uint32_t* fec_bitrate_sent,
                          uint32_t* nackBitrateSent) const;
-  int GetEstimatedReceiveBandwidth(uint32_t* estimated_bandwidth) const;
+  void GetEstimatedReceiveBandwidth(uint32_t* estimated_bandwidth) const;
 
   WebRtc_Word32 StartRTPDump(const char file_nameUTF8[1024],
                              RTPDirections direction);
@@ -306,7 +308,7 @@ class ViEChannel
   // Gets the modules used by the channel.
   RtpRtcp* rtp_rtcp();
 
-  StatsObserver* GetStatsObserver();
+  CallStatsObserver* GetStatsObserver();
 
   // Implements VCMReceiveCallback.
   virtual WebRtc_Word32 FrameToRender(I420VideoFrame& video_frame);  // NOLINT
@@ -364,6 +366,8 @@ class ViEChannel
   WebRtc_Word32 ProcessFECRequest(const bool enable,
                                   const unsigned char payload_typeRED,
                                   const unsigned char payload_typeFEC);
+  // Compute NACK list parameters for the buffering mode.
+  int GetRequiredNackListSize(int target_delay_ms);
 
   WebRtc_Word32 channel_id_;
   WebRtc_Word32 engine_id_;
@@ -379,6 +383,7 @@ class ViEChannel
   // Owned modules/classes.
   scoped_ptr<RtpRtcp> rtp_rtcp_;
   std::list<RtpRtcp*> simulcast_rtp_rtcp_;
+  std::list<RtpRtcp*> removed_rtp_rtcp_;
 #ifndef WEBRTC_EXTERNAL_TRANSPORT
   UdpTransport& socket_transport_;
 #endif
@@ -422,6 +427,9 @@ class ViEChannel
   // User set MTU, -1 if not set.
   uint16_t mtu_;
   const bool sender_;
+
+  int nack_history_size_sender_;
+  int max_nack_reordering_threshold_;
 };
 
 }  // namespace webrtc
