@@ -42,6 +42,7 @@ LOCAL_SRC_FILES := \
     thread_posix.cc \
     rw_lock_posix.cc \
     tick_util.cc \
+	clock.cc \
     ../../../../client/threadpriorityhandler.cc
 
 ifeq ($(ENABLE_WEBRTC_TRACE), 1)

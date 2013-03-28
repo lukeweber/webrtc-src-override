@@ -24,6 +24,7 @@ LOCAL_SRC_FILES := \
     rtcp_receiver_help.cc \
     rtcp_sender.cc \
     rtcp_utility.cc \
+	rtp_payload_registry.cc \
     rtp_receiver.cc \
     rtp_sender.cc \
     rtp_utility.cc \

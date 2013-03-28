@@ -59,6 +59,7 @@ LOCAL_CFLAGS := \
 
 
 LOCAL_C_INCLUDES := \
+	$(MY_THIRD_PARTY_PATH) \
     $(MY_WEBRTC_PATH) \
     $(MY_WEBRTC_PATH)/modules/audio_coding/codecs/cng/include \
     $(MY_WEBRTC_PATH)/common_audio/signal_processing/include \

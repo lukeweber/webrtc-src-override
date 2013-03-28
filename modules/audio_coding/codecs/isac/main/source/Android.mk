@@ -51,6 +51,7 @@ LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
 
 LOCAL_C_INCLUDES := \
+	$(MY_THIRD_PARTY_PATH) \
     $(MY_WEBRTC_PATH) \
     $(MY_WEBRTC_PATH)/common_audio/signal_processing/include
 
