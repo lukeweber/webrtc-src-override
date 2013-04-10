@@ -89,6 +89,7 @@ LOCAL_MODULE_CLASS := STATIC_LIBRARIES
 LOCAL_MODULE := libwebrtc_isacfix_neon
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := \
+    entropy_coding_neon.c \
     filterbanks_neon.S \
     filters_neon.S \
     lattice_neon.S \

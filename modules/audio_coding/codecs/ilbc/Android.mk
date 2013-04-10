@@ -108,59 +108,59 @@ include $(BUILD_STATIC_LIBRARY)
 
 
 # iLBC test app
-include $(CLEAR_VARS)
-
-LOCAL_MODULE_TAGS := tests
-LOCAL_CPP_EXTENSION := .cc
-LOCAL_SRC_FILES:= test/iLBC_test.c
-
-# Flags passed to both C and C++ files.
-LOCAL_CFLAGS := $(MY_WEBRTC_COMMON_DEFS)
-
-LOCAL_C_INCLUDES := \
-    $(LOCAL_PATH)/interface \
-    $(LOCAL_PATH)/../../../..
-
-LOCAL_STATIC_LIBRARIES := \
-    libwebrtc_ilbc \
-    libwebrtc_spl
-
-LOCAL_SHARED_LIBRARIES := \
-    libutils
-
-LOCAL_MODULE:= webrtc_ilbc_test
-
-ifdef NDK_ROOT
-include $(BUILD_EXECUTABLE)
-else
-include $(BUILD_NATIVE_TEST)
-endif
-
-# iLBC_testLib test app
-include $(CLEAR_VARS)
-
-LOCAL_MODULE_TAGS := tests
-LOCAL_CPP_EXTENSION := .cc
-LOCAL_SRC_FILES:= test/iLBC_testLib.c
-
-# Flags passed to both C and C++ files.
-LOCAL_CFLAGS := $(MY_WEBRTC_COMMON_DEFS)
-
-LOCAL_C_INCLUDES := \
-    $(LOCAL_PATH)/interface \
-    $(LOCAL_PATH)/../../../..
-
-LOCAL_STATIC_LIBRARIES := \
-    libwebrtc_ilbc \
-    libwebrtc_spl
-
-LOCAL_SHARED_LIBRARIES := \
-    libutils
-
-LOCAL_MODULE:= webrtc_ilbc_testLib
-
-ifdef NDK_ROOT
-include $(BUILD_EXECUTABLE)
-else
-include $(BUILD_NATIVE_TEST)
-endif
+#include $(CLEAR_VARS)
+#
+#LOCAL_MODULE_TAGS := tests
+#LOCAL_CPP_EXTENSION := .cc
+#LOCAL_SRC_FILES:= test/iLBC_test.c
+#
+## Flags passed to both C and C++ files.
+#LOCAL_CFLAGS := $(MY_WEBRTC_COMMON_DEFS)
+#
+#LOCAL_C_INCLUDES := \
+#    $(LOCAL_PATH)/interface \
+#    $(LOCAL_PATH)/../../../..
+#
+#LOCAL_STATIC_LIBRARIES := \
+#    libwebrtc_ilbc \
+#    libwebrtc_spl
+#
+#LOCAL_SHARED_LIBRARIES := \
+#    libutils
+#
+#LOCAL_MODULE:= webrtc_ilbc_test
+#
+#ifdef NDK_ROOT
+#include $(BUILD_EXECUTABLE)
+#else
+#include $(BUILD_NATIVE_TEST)
+#endif
+#
+## iLBC_testLib test app
+#include $(CLEAR_VARS)
+#
+#LOCAL_MODULE_TAGS := tests
+#LOCAL_CPP_EXTENSION := .cc
+#LOCAL_SRC_FILES:= test/iLBC_testLib.c
+#
+## Flags passed to both C and C++ files.
+#LOCAL_CFLAGS := $(MY_WEBRTC_COMMON_DEFS)
+#
+#LOCAL_C_INCLUDES := \
+#    $(LOCAL_PATH)/interface \
+#    $(LOCAL_PATH)/../../../..
+#
+#LOCAL_STATIC_LIBRARIES := \
+#    libwebrtc_ilbc \
+#    libwebrtc_spl
+#
+#LOCAL_SHARED_LIBRARIES := \
+#    libutils
+#
+#LOCAL_MODULE:= webrtc_ilbc_testLib
+#
+#ifdef NDK_ROOT
+#include $(BUILD_EXECUTABLE)
+#else
+#include $(BUILD_NATIVE_TEST)
+#endif

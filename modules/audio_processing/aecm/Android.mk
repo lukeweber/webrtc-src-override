@@ -57,16 +57,17 @@ LOCAL_MODULE_CLASS := STATIC_LIBRARIES
 LOCAL_MODULE := libwebrtc_aecm_neon
 LOCAL_MODULE_TAGS := optional
 
-AECM_ASM_HEADER := $(intermediates)/aecm_core_neon_offsets.h
-AECM_ASM_HEADER_DIR := $(intermediates)
+AECM_ASM_HEADER := $(LOCAL_PATH)/aecm_core_neon_offsets.h
+AECM_ASM_HEADER_DIR := $(LOCAL_PATH)
 
 # Generate a header file aecm_core_neon_offsets.h which will be included in
 # assembly file aecm_core_neon.S, from file aecm_core_neon_offsets.c.
-$(AECM_ASM_HEADER): $(LOCAL_PATH)/../../../build/generate_asm_header.py \
+$(AECM_ASM_HEADER): $(MY_WEBRTC_PATH)/build/generate_asm_header.py \
 	    $(LOCAL_PATH)/aecm_core_neon_offsets.c
-	@python $^ --compiler=$(TARGET_CC) --options="$(addprefix -I, \
-		$(LOCAL_INCLUDES)) $(addprefix -isystem , $(TARGET_C_INCLUDES)) -S" \
-		--dir=$(AECM_ASM_HEADER_DIR)
+#Original version
+#	@python $^ --compiler=$(TARGET_CC) --options="$(addprefix -I, \
+#		$(LOCAL_INCLUDES)) $(addprefix -isystem , $(TARGET_C_INCLUDES)) -S" \
+#		--pattern=offset_ --dir=$(NS_ASM_HEADER_DIR)
 
 LOCAL_GENERATED_SOURCES := $(AECM_ASM_HEADER)
 LOCAL_SRC_FILES := aecm_core_neon.S
@@ -74,18 +75,31 @@ LOCAL_SRC_FILES := aecm_core_neon.S
 # Flags passed to both C and C++ files.
 LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS) \
+	$(MY_ARM_CFLAGS_NEON) \
     -mfpu=neon \
     -mfloat-abi=softfp \
-    -flax-vector-conversions
 
 LOCAL_C_INCLUDES := \
     $(AECM_ASM_HEADER_DIR) \
-    $(LOCAL_PATH)/include \
-    $(LOCAL_PATH)/../../.. \
-    $(LOCAL_PATH)/../../../common_audio/signal_processing/include \
-    external/webrtc
+    $(MY_THIRD_PARTY_PATH) \
+    $(MY_WEBRTC_PATH) \
+    $(MY_WEBRTC_PATH)/../ \
+    $(MY_WEBRTC_PATH)/modules/audio_processing/utility \
+    $(MY_WEBRTC_PATH)/common_audio/signal_processing/include \
+    $(MY_WEBRTC_PATH)/system_wrappers/interface \
+    $(LOCAL_PATH)/include
 
 LOCAL_INCLUDES := $(LOCAL_C_INCLUDES)
+
+ifeq ($(NDK_TOOLCHAIN_VERSION),clang3.2)
+	PATTERN_OFFSET := _offset_
+else
+	PATTERN_OFFSET := offset_
+endif
+$(shell python $(MY_WEBRTC_PATH)/build/generate_asm_header.py \
+	$(LOCAL_PATH)/aecm_core_neon_offsets.c --compiler=$(TARGET_CC) --options="$(addprefix -I, \
+		$(LOCAL_INCLUDES)) $(addprefix -isystem , $(TARGET_C_INCLUDES)) -S" \
+		--pattern=$(PATTERN_OFFSET) --dir=$(AECM_ASM_HEADER_DIR))
 
 ifndef NDK_ROOT
 include external/stlport/libstlport.mk

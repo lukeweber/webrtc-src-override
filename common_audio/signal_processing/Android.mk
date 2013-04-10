@@ -110,7 +110,9 @@ LOCAL_SRC_FILES := \
 # Flags passed to both C and C++ files.
 LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS) \
-    $(MY_ARM_CFLAGS_NEON)
+    $(MY_ARM_CFLAGS_NEON) \
+    -mfpu=neon \
+    -mfloat-abi=softfp
 
 LOCAL_C_INCLUDES := \
     $(MY_THIRD_PARTY_PATH) \
