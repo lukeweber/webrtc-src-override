@@ -39,6 +39,14 @@ LOCAL_SRC_FILES := \
 LOCAL_CFLAGS := \
     $(MY_WEBRTC_COMMON_DEFS)
 
+ifeq ($(WEBRTC_BUILD_WITH_OPUS), true)
+LOCAL_SRC_FILES += \
+    acm_opus.cc
+
+LOCAL_CFLAGS += \
+    -DWEBRTC_CODEC_OPUS
+endif
+
 LOCAL_C_INCLUDES := \
     $(MY_THIRD_PARTY_PATH) \
     $(MY_WEBRTC_PATH) \
