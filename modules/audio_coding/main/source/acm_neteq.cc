@@ -227,7 +227,7 @@ WebRtc_Word16 ACMNetEQ::AllocatePacketBufferByIdxSafe(
   }
   if (WebRtcNetEQ_GetRecommendedBufferSize(inst_[idx], used_codecs,
                                            num_codecs,
-                                           kUDPNormal, /* Changed from: kTCPXLargeJitter because of large delay*/
+                                           kTCPXLargeJitter, // This was kUDPNormal and was changed back https://code.google.com/p/webrtc/issues/detail?id=1627
                                            &max_num_packets,
                                            &buffer_size_in_bytes,
                                            &per_packet_overhead_bytes) != 0) {
