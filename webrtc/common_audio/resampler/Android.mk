@@ -26,6 +26,7 @@ LOCAL_CFLAGS := \
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/include \
     $(LOCAL_PATH)/../.. \
+    $(LOCAL_PATH)/../../.. \
     $(LOCAL_PATH)/../signal_processing/include 
 
 LOCAL_SHARED_LIBRARIES := \

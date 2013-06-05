@@ -50,6 +50,7 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../../codecs/pcm16b/include \
     $(LOCAL_PATH)/../../neteq/interface \
     $(LOCAL_PATH)/../../../.. \
+    $(LOCAL_PATH)/../../../../.. \
     $(LOCAL_PATH)/../../../interface \
     $(LOCAL_PATH)/../../../../common_audio/resampler/include \
     $(LOCAL_PATH)/../../../../common_audio/signal_processing/include \

@@ -62,6 +62,7 @@ LOCAL_CFLAGS := \
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../interface \
     $(LOCAL_PATH)/../../../../../.. \
+    $(LOCAL_PATH)/../../../../../../.. \
     $(LOCAL_PATH)/../../../../../../common_audio/signal_processing/include
 
 LOCAL_STATIC_LIBRARIES += libwebrtc_system_wrappers

@@ -33,18 +33,18 @@ LOCAL_SRC_FILES := \
     dtmf_queue.cc \
     rtp_receiver_audio.cc \
     rtp_sender_audio.cc \
-    bandwidth_management.cc \
     forward_error_correction.cc \
     forward_error_correction_internal.cc \
-    overuse_detector.cc \
-    remote_rate_control.cc \
     rtp_packet_history.cc \
     receiver_fec.cc \
     rtp_receiver_video.cc \
     rtp_sender_video.cc \
     rtp_format_vp8.cc \
-    transmission_bucket.cc \
     vp8_partition_aggregator.cc
+    #transmission_bucket.cc \
+    #remote_rate_control.cc \
+    #bandwidth_management.cc \
+    #overuse_detector.cc \
 
 # Flags passed to both C and C++ files.
 LOCAL_CFLAGS := \
@@ -53,6 +53,7 @@ LOCAL_CFLAGS := \
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../interface \
     $(LOCAL_PATH)/../../.. \
+    $(LOCAL_PATH)/../../../.. \
     $(LOCAL_PATH)/../../interface \
     $(LOCAL_PATH)/../../../system_wrappers/interface 
 

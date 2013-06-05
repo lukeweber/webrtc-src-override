@@ -26,12 +26,15 @@ include $(MY_WEBRTC_ROOT_PATH)/webrtc/test/Android.mk
 # build .so
 LOCAL_PATH := $(call my-dir)
 
+
 include $(CLEAR_VARS)
 include $(LOCAL_PATH)/../../external/webrtc/android-webrtc.mk
 
 LOCAL_ARM_MODE := arm
 LOCAL_MODULE := libwebrtc_audio_preprocessing
 LOCAL_MODULE_TAGS := optional
+
+LOCAL_C_INCLUDES := $(MY_WEBRTC_ROOT_PATH)/webrtc
 
 LOCAL_WHOLE_STATIC_LIBRARIES := \
     libwebrtc_spl \

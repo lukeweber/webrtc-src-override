@@ -31,6 +31,7 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../../interface \
     $(LOCAL_PATH)/../../audio_processing/include \
     $(LOCAL_PATH)/../../.. \
+    $(LOCAL_PATH)/../../../.. \
     $(LOCAL_PATH)/../../../system_wrappers/interface
 
 LOCAL_SHARED_LIBRARIES := \

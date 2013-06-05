@@ -38,6 +38,7 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../../video_coding/main/interface \
     $(LOCAL_PATH)/../../video_coding/codecs/interface \
     $(LOCAL_PATH)/../../.. \
+    $(LOCAL_PATH)/../../../.. \
     $(LOCAL_PATH)/../../../common_video/vplib/main/interface \
     $(LOCAL_PATH)/../../../common_audio/resampler/include \
     $(LOCAL_PATH)/../../../system_wrappers/interface \

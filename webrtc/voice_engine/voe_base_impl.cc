@@ -936,6 +936,12 @@ int VoEBaseImpl::GetVersion(char version[1024])
 
 int32_t VoEBaseImpl::AddBuildInfo(char* str) const
 {
+#ifndef WEBRTC_SVNREVISION
+#define WEBRTC_SVNREVISION "unknown_svn_revision"
+#endif
+#ifndef BUILDINFO
+#define BUILDINFO "unknown_build_info"
+#endif
     return sprintf(str, "Build: svn:%s %s\n", WEBRTC_SVNREVISION, BUILDINFO);
 }
 

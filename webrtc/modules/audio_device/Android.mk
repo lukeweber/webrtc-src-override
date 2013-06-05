@@ -10,7 +10,7 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-include $(LOCAL_PATH)/../../../../../android-webrtc.mk
+include $(LOCAL_PATH)/../../../android-webrtc.mk
 
 LOCAL_ARM_MODE := arm
 LOCAL_MODULE_CLASS := STATIC_LIBRARIES
@@ -22,10 +22,10 @@ LOCAL_SRC_FILES := \
     audio_device_generic.cc \
     audio_device_utility.cc \
     audio_device_impl.cc \
-    android/audio_device_android_opensles.cc \
+    android/audio_device_opensles_android.cc \
     android/audio_device_utility_android.cc \
-    dummy/audio_device_utility_dummy.cc \
-    dummy/audio_device_dummy.cc
+    #dummy/audio_device_utility_dummy.cc \
+    #dummy/audio_device_dummy.cc
 
 # Flags passed to both C and C++ files.
 LOCAL_CFLAGS := \
@@ -34,15 +34,18 @@ LOCAL_CFLAGS := \
 
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH) \
+    $(LOCAL_PATH)/include \
     $(LOCAL_PATH)/android \
     $(LOCAL_PATH)/dummy \
     $(LOCAL_PATH)/linux \
+    $(LOCAL_PATH)/main/interface \
     $(LOCAL_PATH)/../interface \
-    $(LOCAL_PATH)/../../../.. \
-    $(LOCAL_PATH)/../../../interface \
-    $(LOCAL_PATH)/../../../../common_audio/resampler/include \
-    $(LOCAL_PATH)/../../../../common_audio/signal_processing/include \
-    $(LOCAL_PATH)/../../../../system_wrappers/interface \
+    $(LOCAL_PATH)/../../.. \
+    $(LOCAL_PATH)/../.. \
+    $(LOCAL_PATH)/.. \
+    $(LOCAL_PATH)/../../common_audio/resampler/include \
+    $(LOCAL_PATH)/../../common_audio/signal_processing/include \
+    $(LOCAL_PATH)/../../system_wrappers/interface \
     system/media/wilhelm/include
 
 LOCAL_SHARED_LIBRARIES := \
