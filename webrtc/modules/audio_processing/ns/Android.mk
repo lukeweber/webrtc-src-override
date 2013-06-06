@@ -32,6 +32,7 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/include \
     $(LOCAL_PATH)/../utility \
     $(LOCAL_PATH)/../../.. \
+    $(LOCAL_PATH)/../../../.. \
     $(LOCAL_PATH)/../../../common_audio/signal_processing/include \
     $(LOCAL_PATH)/../../../system_wrappers/interface \
     external/webrtc
@@ -47,49 +48,49 @@ ifndef NDK_ROOT
 include external/stlport/libstlport.mk
 endif
 include $(BUILD_STATIC_LIBRARY)
-
-#############################
-# Build the neon library.
-ifeq ($(WEBRTC_BUILD_NEON_LIBS),true)
-
-include $(CLEAR_VARS)
-
-LOCAL_ARM_MODE := arm
-LOCAL_MODULE_CLASS := STATIC_LIBRARIES
-LOCAL_MODULE := libwebrtc_ns_neon
-LOCAL_MODULE_TAGS := optional
-NS_ASM_HEADER := $(intermediates)/ns_core_neon_offsets.h
-NS_ASM_HEADER_DIR := $(intermediates)
-
-# Generate a header file nsx_core_neon_offsets.h which will be included in
-# assembly file nsx_core_neon.S, from file nsx_core_neon_offsets.c.
-$(NS_ASM_HEADER): $(LOCAL_PATH)/../../../build/generate_asm_header.py \
-	    $(LOCAL_PATH)/nsx_core_neon_offsets.c
-	@python $^ --compiler=$(TARGET_CC) --options="$(addprefix -I, \
-		$(LOCAL_INCLUDES)) $(addprefix -isystem , $(TARGET_C_INCLUDES)) -S" \
-		--dir=$(NS_ASM_HEADER_DIR)
-
-LOCAL_GENERATED_SOURCES := $(NS_ASM_HEADER)
-LOCAL_SRC_FILES := nsx_core_neon.S
-
-# Flags passed to both C and C++ files.
-LOCAL_CFLAGS := \
-    $(MY_WEBRTC_COMMON_DEFS) \
-    -mfpu=neon \
-    -mfloat-abi=softfp \
-    -flax-vector-conversions
-
-LOCAL_C_INCLUDES := \
-    $(NS_ASM_HEADER_DIR) \
-    $(LOCAL_PATH)/include \
-    $(LOCAL_PATH)/../../.. \
-    $(LOCAL_PATH)/../../../common_audio/signal_processing/include \
-    external/webrtc
-
-LOCAL_INCLUDES := $(LOCAL_C_INCLUDES)
-
-ifndef NDK_ROOT
-include external/stlport/libstlport.mk
-endif
-include $(BUILD_STATIC_LIBRARY)
-endif # ifeq ($(WEBRTC_BUILD_NEON_LIBS),true)
+#     NFHACK disable neon for now
+#     #############################
+#     # Build the neon library.
+#     ifeq ($(WEBRTC_BUILD_NEON_LIBS),true)
+#     
+#     include $(CLEAR_VARS)
+#     
+#     LOCAL_ARM_MODE := arm
+#     LOCAL_MODULE_CLASS := STATIC_LIBRARIES
+#     LOCAL_MODULE := libwebrtc_ns_neon
+#     LOCAL_MODULE_TAGS := optional
+#     NS_ASM_HEADER := $(intermediates)/ns_core_neon_offsets.h
+#     NS_ASM_HEADER_DIR := $(intermediates)
+#     
+#     # Generate a header file nsx_core_neon_offsets.h which will be included in
+#     # assembly file nsx_core_neon.S, from file nsx_core_neon_offsets.c.
+#     $(NS_ASM_HEADER): $(LOCAL_PATH)/../../../build/generate_asm_header.py \
+#     	    $(LOCAL_PATH)/nsx_core_neon_offsets.c
+#     	@python $^ --compiler=$(TARGET_CC) --options="$(addprefix -I, \
+#     		$(LOCAL_INCLUDES)) $(addprefix -isystem , $(TARGET_C_INCLUDES)) -S" \
+#     		--dir=$(NS_ASM_HEADER_DIR)
+#     
+#     LOCAL_GENERATED_SOURCES := $(NS_ASM_HEADER)
+#     LOCAL_SRC_FILES := nsx_core_neon.S
+#     
+#     # Flags passed to both C and C++ files.
+#     LOCAL_CFLAGS := \
+#         $(MY_WEBRTC_COMMON_DEFS) \
+#         -mfpu=neon \
+#         -mfloat-abi=softfp \
+#         -flax-vector-conversions
+#     
+#     LOCAL_C_INCLUDES := \
+#         $(NS_ASM_HEADER_DIR) \
+#         $(LOCAL_PATH)/include \
+#         $(LOCAL_PATH)/../../.. \
+#         $(LOCAL_PATH)/../../../common_audio/signal_processing/include \
+#         external/webrtc
+#     
+#     LOCAL_INCLUDES := $(LOCAL_C_INCLUDES)
+#     
+#     ifndef NDK_ROOT
+#     include external/stlport/libstlport.mk
+#     endif
+#     include $(BUILD_STATIC_LIBRARY)
+#     endif # ifeq ($(WEBRTC_BUILD_NEON_LIBS),true)

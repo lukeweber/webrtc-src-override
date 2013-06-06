@@ -92,36 +92,38 @@ include external/stlport/libstlport.mk
 endif
 include $(BUILD_STATIC_LIBRARY)
 
-#########################
-# Build the neon library.
-ifeq ($(WEBRTC_BUILD_NEON_LIBS),true)
-
-include $(CLEAR_VARS)
-
-LOCAL_ARM_MODE := arm
-LOCAL_MODULE_CLASS := STATIC_LIBRARIES
-LOCAL_MODULE := libwebrtc_spl_neon
-LOCAL_MODULE_TAGS := optional
-LOCAL_SRC_FILES := \
-    cross_correlation_neon.S \
-    downsample_fast_neon.S \
-    min_max_operations_neon.S \
-    vector_scaling_operations_neon.S
-
-# Flags passed to both C and C++ files.
-LOCAL_CFLAGS := \
-    $(MY_WEBRTC_COMMON_DEFS) \
-    $(MY_ARM_CFLAGS_NEON)
-
-LOCAL_C_INCLUDES := \
-    $(LOCAL_PATH)/include \
-    $(LOCAL_PATH)/../.. \
-    external/webrtc
-
-ifndef NDK_ROOT
-include external/stlport/libstlport.mk
-endif
-include $(BUILD_STATIC_LIBRARY)
-
-endif # ifeq ($(WEBRTC_BUILD_NEON_LIBS),true)
+#      NFHACK Dont but neon for android quite yet
+#      #########################
+#      # Build the neon library.
+#      ifeq ($(WEBRTC_BUILD_NEON_LIBS),true)
+#      
+#      include $(CLEAR_VARS)
+#      
+#      LOCAL_ARM_MODE := arm
+#      LOCAL_MODULE_CLASS := STATIC_LIBRARIES
+#      LOCAL_MODULE := libwebrtc_spl_neon
+#      LOCAL_MODULE_TAGS := optional
+#      LOCAL_SRC_FILES := \
+#          cross_correlation_neon.S \
+#          downsample_fast_neon.S \
+#          min_max_operations_neon.S \
+#          vector_scaling_operations_neon.S
+#      
+#      # Flags passed to both C and C++ files.
+#      LOCAL_CFLAGS := \
+#          $(MY_WEBRTC_COMMON_DEFS) \
+#          $(MY_ARM_CFLAGS_NEON)
+#      
+#      LOCAL_C_INCLUDES := \
+#          $(LOCAL_PATH)/include \
+#          $(LOCAL_PATH)/../.. \
+#          $(LOCAL_PATH)/../../.. \
+#          external/webrtc
+#      
+#      ifndef NDK_ROOT
+#      include external/stlport/libstlport.mk
+#      endif
+#      include $(BUILD_STATIC_LIBRARY)
+#      
+#      endif # ifeq ($(WEBRTC_BUILD_NEON_LIBS),true)
 

@@ -38,14 +38,14 @@ LOCAL_C_INCLUDES := $(MY_WEBRTC_ROOT_PATH)/webrtc
 
 LOCAL_WHOLE_STATIC_LIBRARIES := \
     libwebrtc_spl \
-    libwebrtc_apm \
-    libwebrtc_apm_utility \
     libwebrtc_vad \
     libwebrtc_ns \
     libwebrtc_agc \
     libwebrtc_aec \
     libwebrtc_aecm \
     libwebrtc_system_wrappers
+    #libwebrtc_apm \
+    #libwebrtc_apm_utility \
 
 # Add Neon libraries.
 ifeq ($(WEBRTC_BUILD_NEON_LIBS),true)
