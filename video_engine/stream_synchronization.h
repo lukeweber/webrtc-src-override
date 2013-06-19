@@ -13,8 +13,8 @@
 
 #include <list>
 
-#include "modules/remote_bitrate_estimator/include/rtp_to_ntp.h"
-#include "typedefs.h"  // NOLINT
+#include "webrtc/modules/remote_bitrate_estimator/include/rtp_to_ntp.h"
+#include "webrtc/typedefs.h"
 
 namespace webrtc {
 
@@ -52,6 +52,7 @@ class StreamSynchronization {
   int audio_channel_id_;
   int video_channel_id_;
   int base_target_delay_ms_;
+  int avg_diff_ms_;
 };
 }  // namespace webrtc
 

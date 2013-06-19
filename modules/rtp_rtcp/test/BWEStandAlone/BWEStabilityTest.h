@@ -13,11 +13,9 @@
 
 #include <string>
 
-#include "BWETestBase.h"
-
-#include "typedefs.h"
-
-#include "TestSenderReceiver.h"
+#include "webrtc/modules/rtp_rtcp/test/BWEStandAlone/BWETestBase.h"
+#include "webrtc/modules/rtp_rtcp/test/BWEStandAlone/TestSenderReceiver.h"
+#include "webrtc/typedefs.h"
 
 class BWEStabilityTest : public BWEOneWayTest
 {
@@ -25,7 +23,7 @@ public:
     BWEStabilityTest(std::string testName, int rateKbps, int testDurationSeconds);
     virtual ~BWEStabilityTest();
 
-    virtual int Init(std::string ip, WebRtc_UWord16 port);
+    virtual int Init(std::string ip, uint16_t port);
     virtual void Report(std::fstream &log);
 
 protected:

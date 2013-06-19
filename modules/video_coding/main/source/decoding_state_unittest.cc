@@ -31,7 +31,9 @@ TEST(TestDecodingState, FrameContinuity) {
   VCMDecodingState dec_state;
   // Check that makes decision based on correct method.
   VCMFrameBuffer frame;
+  VCMFrameBuffer frame_key;
   frame.SetState(kStateEmpty);
+  frame_key.SetState(kStateEmpty);
   VCMPacket* packet = new VCMPacket();
   packet->isFirstPacket = 1;
   packet->timestamp = 1;
@@ -40,11 +42,15 @@ TEST(TestDecodingState, FrameContinuity) {
   packet->codecSpecificHeader.codec = kRTPVideoVP8;
   packet->codecSpecificHeader.codecHeader.VP8.pictureId = 0x007F;
   frame.InsertPacket(*packet, 0, false, 0);
-  // Should return true on init.
+  // Always start with a key frame.
   dec_state.Reset();
-  EXPECT_TRUE(dec_state.ContinuousFrame(&frame));
+  EXPECT_FALSE(dec_state.ContinuousFrame(&frame));
+  packet->frameType = kVideoFrameKey;
+  frame_key.InsertPacket(*packet, 0, false, 0);
+  EXPECT_TRUE(dec_state.ContinuousFrame(&frame_key));
   dec_state.SetState(&frame);
   frame.Reset();
+  packet->frameType = kVideoFrameDelta;
   // Use pictureId
   packet->codecSpecificHeader.codecHeader.VP8.pictureId = 0x0002;
   frame.InsertPacket(*packet, 0, false, 0);
@@ -159,38 +165,6 @@ TEST(TestDecodingState, FrameContinuity) {
   // The current frame is not continuous
   dec_state.SetState(&frame);
   EXPECT_FALSE(dec_state.ContinuousFrame(&frame));
-  delete packet;
-}
-
-TEST(TestDecodingState, SetStateOneBack) {
-  VCMDecodingState dec_state;
-  VCMFrameBuffer frame;
-  frame.SetState(kStateEmpty);
-  VCMPacket* packet = new VCMPacket();
-  // Based on PictureId.
-  packet->frameType = kVideoFrameDelta;
-  packet->codecSpecificHeader.codec = kRTPVideoVP8;
-  packet->timestamp = 0;
-  packet->seqNum = 0;
-  packet->codecSpecificHeader.codecHeader.VP8.pictureId = 0;
-  packet->frameType = kVideoFrameDelta;
-  frame.InsertPacket(*packet, 0, false, 0);
-  dec_state.SetStateOneBack(&frame);
-  EXPECT_EQ(dec_state.sequence_num(), 0xFFFF);
-  // Check continuity.
-  EXPECT_TRUE(dec_state.ContinuousFrame(&frame));
-
-  // Based on Temporal layers.
-  packet->timestamp = 0;
-  packet->seqNum = 0;
-  packet->codecSpecificHeader.codecHeader.VP8.pictureId = kNoPictureId;
-  packet->frameType = kVideoFrameDelta;
-  packet->codecSpecificHeader.codecHeader.VP8.tl0PicIdx = 0;
-  packet->codecSpecificHeader.codecHeader.VP8.temporalIdx = 0;
-  frame.InsertPacket(*packet, 0, false, 0);
-  dec_state.SetStateOneBack(&frame);
-  // Check continuity
-  EXPECT_TRUE(dec_state.ContinuousFrame(&frame));
   delete packet;
 }
 
@@ -458,5 +432,4 @@ TEST(TestDecodingState, OldInput) {
 
   delete packet;
 }
-
 }  // namespace webrtc

@@ -8,14 +8,14 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "video_engine/vie_file_recorder.h"
+#include "webrtc/video_engine/vie_file_recorder.h"
 
-#include "modules/utility/interface/file_player.h"
-#include "modules/utility/interface/file_recorder.h"
-#include "system_wrappers/interface/critical_section_wrapper.h"
-#include "system_wrappers/interface/tick_util.h"
-#include "system_wrappers/interface/trace.h"
-#include "video_engine/vie_defines.h"
+#include "webrtc/modules/utility/interface/file_player.h"
+#include "webrtc/modules/utility/interface/file_recorder.h"
+#include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
+#include "webrtc/system_wrappers/interface/tick_util.h"
+#include "webrtc/system_wrappers/interface/trace.h"
+#include "webrtc/video_engine/vie_defines.h"
 
 namespace webrtc {
 
@@ -188,8 +188,8 @@ void ViEFileRecorder::RecordVideoFrame(const I420VideoFrame& video_frame) {
 
     // Compensate for frame delay in order to get audio/video sync when
     // recording local video.
-    const WebRtc_UWord32 time_stamp = video_frame.timestamp();
-    const WebRtc_Word64 render_time_stamp = video_frame.render_time_ms();
+    const uint32_t time_stamp = video_frame.timestamp();
+    const int64_t render_time_stamp = video_frame.render_time_ms();
     I420VideoFrame& unconst_video_frame =
         const_cast<I420VideoFrame&>(video_frame);
     unconst_video_frame.set_timestamp(time_stamp - 90 * frame_delay_);
@@ -215,9 +215,9 @@ bool ViEFileRecorder::Write(const void* buf, int len) {
   }
 
   AudioFrame audio_frame;
-  WebRtc_UWord16 length_in_samples = len / 2;
+  uint16_t length_in_samples = len / 2;
   audio_frame.UpdateFrame(audio_channel_, 0,
-                          static_cast<const WebRtc_Word16*>(buf),
+                          static_cast<const int16_t*>(buf),
                           length_in_samples, length_in_samples * 100,
                           AudioFrame::kUndefined,
                           AudioFrame::kVadUnknown);

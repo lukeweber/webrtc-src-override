@@ -28,10 +28,12 @@
       },
       'sources': [
         # Common
+        '../interface/rtp_header_parser.h',
         '../interface/rtp_rtcp.h',
         '../interface/rtp_rtcp_defines.h',
         'bitrate.cc',
         'bitrate.h',
+        'rtp_header_parser.cc',
         'rtp_rtcp_config.h',
         'rtp_rtcp_impl.cc',
         'rtp_rtcp_impl.h',
@@ -97,9 +99,3 @@
     },
   ],
 }
-
-# Local Variables:
-# tab-width:2
-# indent-tabs-mode:nil
-# End:
-# vim: set expandtab tabstop=2 shiftwidth=2:

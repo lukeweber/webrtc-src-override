@@ -17,8 +17,6 @@
 
 #include <algorithm>
 
-#include "gtest/gtest.h"
-
 #include "webrtc/modules/audio_processing/include/audio_processing.h"
 #include "webrtc/modules/interface/module_common_types.h"
 #include "webrtc/system_wrappers/interface/cpu_features_wrapper.h"
@@ -27,8 +25,10 @@
 #include "webrtc/test/testsupport/fileutils.h"
 #include "webrtc/test/testsupport/perf_test.h"
 #ifdef WEBRTC_ANDROID_PLATFORM_BUILD
+#include "gtest/gtest.h"
 #include "external/webrtc/webrtc/modules/audio_processing/debug.pb.h"
 #else
+#include "testing/gtest/include/gtest/gtest.h"
 #include "webrtc/audio_processing/debug.pb.h"
 #endif
 
@@ -104,9 +104,12 @@ void usage() {
   printf("  --no_drift_compensation\n");
   printf("  --no_echo_metrics\n");
   printf("  --no_delay_logging\n");
+  printf("  --aec_suppression_level LEVEL  [0 - 2]\n");
   printf("\n  -aecm    Echo control mobile\n");
   printf("  --aecm_echo_path_in_file FILE\n");
   printf("  --aecm_echo_path_out_file FILE\n");
+  printf("  --no_comfort_noise\n");
+  printf("  --routing_mode MODE  [0 - 4]\n");
   printf("\n  -agc     Gain control\n");
   printf("  --analog\n");
   printf("  --adaptive_digital\n");
@@ -275,6 +278,16 @@ void void_main(int argc, char* argv[]) {
     } else if (strcmp(argv[i], "--no_level_metrics") == 0) {
       ASSERT_EQ(apm->kNoError, apm->level_estimator()->Enable(false));
 
+    } else if (strcmp(argv[i], "--aec_suppression_level") == 0) {
+      i++;
+      ASSERT_LT(i, argc) << "Specify level after --aec_suppression_level";
+      int suppression_level;
+      ASSERT_EQ(1, sscanf(argv[i], "%d", &suppression_level));
+      ASSERT_EQ(apm->kNoError,
+                apm->echo_cancellation()->set_suppression_level(
+                    static_cast<webrtc::EchoCancellation::SuppressionLevel>(
+                        suppression_level)));
+
     } else if (strcmp(argv[i], "-aecm") == 0) {
       ASSERT_EQ(apm->kNoError, apm->echo_control_mobile()->Enable(true));
 
@@ -287,6 +300,20 @@ void void_main(int argc, char* argv[]) {
       i++;
       ASSERT_LT(i, argc) << "Specify filename after --aecm_echo_path_out_file";
       aecm_echo_path_out_filename = argv[i];
+
+    } else if (strcmp(argv[i], "--no_comfort_noise") == 0) {
+      ASSERT_EQ(apm->kNoError,
+                apm->echo_control_mobile()->enable_comfort_noise(false));
+
+    } else if (strcmp(argv[i], "--routing_mode") == 0) {
+      i++;
+      ASSERT_LT(i, argc) << "Specify mode after --routing_mode";
+      int routing_mode;
+      ASSERT_EQ(1, sscanf(argv[i], "%d", &routing_mode));
+      ASSERT_EQ(apm->kNoError,
+                apm->echo_control_mobile()->set_routing_mode(
+                    static_cast<webrtc::EchoControlMobile::RoutingMode>(
+                        routing_mode)));
 
     } else if (strcmp(argv[i], "-agc") == 0) {
       ASSERT_EQ(apm->kNoError, apm->gain_control()->Enable(true));
@@ -574,10 +601,10 @@ void void_main(int argc, char* argv[]) {
 
   TickTime t0 = TickTime::Now();
   TickTime t1 = t0;
-  WebRtc_Word64 max_time_us = 0;
-  WebRtc_Word64 max_time_reverse_us = 0;
-  WebRtc_Word64 min_time_us = 1e6;
-  WebRtc_Word64 min_time_reverse_us = 1e6;
+  int64_t max_time_us = 0;
+  int64_t max_time_reverse_us = 0;
+  int64_t min_time_us = 1e6;
+  int64_t min_time_reverse_us = 1e6;
 
   // TODO(ajm): Ideally we would refactor this block into separate functions,
   //            but for now we want to share the variables.
@@ -1015,7 +1042,7 @@ void void_main(int argc, char* argv[]) {
 
   if (perf_testing) {
     if (primary_count > 0) {
-      WebRtc_Word64 exec_time = acc_ticks.Milliseconds();
+      int64_t exec_time = acc_ticks.Milliseconds();
       printf("\nTotal time: %.3f s, file time: %.2f s\n",
         exec_time * 0.001, primary_count * 0.01);
       printf("Time per frame: %.3f ms (average), %.3f ms (max),"

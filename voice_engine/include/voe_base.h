@@ -14,7 +14,6 @@
 //  - Initialization and termination.
 //  - Trace information on text files or via callbacks.
 //  - Multi-channel support (mixing, sending to multiple destinations etc.).
-//  - Call setup (port and address) for receiving and sending sides.
 //
 // To support other codecs than G.711, the VoECodec sub-API must be utilized.
 //
@@ -35,7 +34,7 @@
 #ifndef WEBRTC_VOICE_ENGINE_VOE_BASE_H
 #define WEBRTC_VOICE_ENGINE_VOE_BASE_H
 
-#include "common_types.h"
+#include "webrtc/common_types.h"
 
 namespace webrtc {
 
@@ -51,7 +50,7 @@ public:
     // This method will be called after the occurrence of any runtime error
     // code, or warning notification, when the observer interface has been
     // installed using VoEBase::RegisterVoiceEngineObserver().
-    virtual void CallbackOnError(const int channel, const int errCode) = 0;
+    virtual void CallbackOnError(int channel, int errCode) = 0;
 
 protected:
     virtual ~VoiceEngineObserver() {}
@@ -73,11 +72,11 @@ public:
 
     // Specifies the amount and type of trace information which will be
     // created by the VoiceEngine.
-    static int SetTraceFilter(const unsigned int filter);
+    static int SetTraceFilter(unsigned int filter);
 
     // Sets the name of the trace file and enables non-encrypted trace messages.
     static int SetTraceFile(const char* fileNameUTF8,
-                            const bool addFileCounter = false);
+                            bool addFileCounter = false);
 
     // Installs the TraceCallback implementation to ensure that the user
     // receives callbacks for generated trace messages.
@@ -139,28 +138,6 @@ public:
 
     // Deletes an existing channel and releases the utilized resources.
     virtual int DeleteChannel(int channel) = 0;
-
-    // Sets the local receiver port and address for a specified
-    // |channel| number.
-    virtual int SetLocalReceiver(int channel, int port,
-                                 int RTCPport = kVoEDefault,
-                                 const char ipAddr[64] = NULL,
-                                 const char multiCastAddr[64] = NULL) = 0;
-
-    // Gets the local receiver port and address for a specified
-    // |channel| number.
-    virtual int GetLocalReceiver(int channel, int& port, int& RTCPport,
-                                 char ipAddr[64]) = 0;
-
-    // Sets the destination port and address for a specified |channel| number.
-    virtual int SetSendDestination(int channel, int port,
-                                   const char ipAddr[64],
-                                   int sourcePort = kVoEDefault,
-                                   int RTCPport = kVoEDefault) = 0;
-
-    // Gets the destination port and address for a specified |channel| number.
-    virtual int GetSendDestination(int channel, int& port, char ipAddr[64],
-                                   int& sourcePort, int& RTCPport) = 0;
 
     // Prepares and initiates the VoiceEngine for reception of
     // incoming RTP/RTCP packets on the specified |channel|.

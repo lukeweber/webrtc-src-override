@@ -8,15 +8,15 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include <string.h>
 #include <math.h>
+#include <string.h>
 //#include <stdio.h>
 #include <stdlib.h>
-#include "noise_suppression.h"
-#include "ns_core.h"
-#include "windows_private.h"
-#include "fft4g.h"
-#include "signal_processing_library.h"
+#include "webrtc/common_audio/signal_processing/include/signal_processing_library.h"
+#include "webrtc/modules/audio_processing/ns/include/noise_suppression.h"
+#include "webrtc/modules/audio_processing/ns/ns_core.h"
+#include "webrtc/modules/audio_processing/ns/windows_private.h"
+#include "webrtc/modules/audio_processing/utility/fft4g.h"
 
 // Set Feature Extraction Parameters
 void WebRtcNs_set_feature_extraction_parameters(NSinst_t* inst) {
@@ -68,7 +68,7 @@ void WebRtcNs_set_feature_extraction_parameters(NSinst_t* inst) {
 }
 
 // Initialize state
-int WebRtcNs_InitCore(NSinst_t* inst, WebRtc_UWord32 fs) {
+int WebRtcNs_InitCore(NSinst_t* inst, uint32_t fs) {
   int i;
   //We only support 10ms frames
 

@@ -11,43 +11,42 @@
 #ifndef WEBRTC_MODULES_RTP_RTCP_SOURCE_RECEIVER_FEC_H_
 #define WEBRTC_MODULES_RTP_RTCP_SOURCE_RECEIVER_FEC_H_
 
-#include "rtp_rtcp_defines.h"
 // This header is included to get the nested declaration of Packet structure.
-#include "forward_error_correction.h"
 
-#include "typedefs.h"
+#include "webrtc/modules/rtp_rtcp/interface/rtp_rtcp_defines.h"
+#include "webrtc/modules/rtp_rtcp/source/forward_error_correction.h"
+#include "webrtc/typedefs.h"
 
 namespace webrtc {
 class RTPReceiverVideo;
 
-class ReceiverFEC
-{
-public:
-    ReceiverFEC(const WebRtc_Word32 id, RTPReceiverVideo* owner);
-    virtual ~ReceiverFEC();
+class ReceiverFEC {
+ public:
+  ReceiverFEC(const int32_t id, RTPReceiverVideo* owner);
+  virtual ~ReceiverFEC();
 
-    WebRtc_Word32 AddReceivedFECPacket(const WebRtcRTPHeader* rtpHeader,
-                                       const WebRtc_UWord8* incomingRtpPacket,
-                                       const WebRtc_UWord16 payloadDataLength,
-                                       bool& FECpacket);
+  int32_t AddReceivedFECPacket(const WebRtcRTPHeader* rtp_header,
+                               const uint8_t* incoming_rtp_packet,
+                               const uint16_t payload_data_length,
+                               bool& FECpacket);
 
-    WebRtc_Word32 ProcessReceivedFEC();
+  int32_t ProcessReceivedFEC();
 
-    void SetPayloadTypeFEC(const WebRtc_Word8 payloadType);
+  void SetPayloadTypeFEC(const int8_t payload_type);
 
-private:
-    int ParseAndReceivePacket(const ForwardErrorCorrection::Packet* packet);
+ private:
+  int ParseAndReceivePacket(const ForwardErrorCorrection::Packet* packet);
 
-    int _id;
-    RTPReceiverVideo* _owner;
-    ForwardErrorCorrection* _fec;
-    // TODO(holmer): In the current version _receivedPacketList is never more
-    // than one packet, since we process FEC every time a new packet
-    // arrives. We should remove the list.
-    ForwardErrorCorrection::ReceivedPacketList _receivedPacketList;
-    ForwardErrorCorrection::RecoveredPacketList _recoveredPacketList;
-    WebRtc_Word8 _payloadTypeFEC;
+  int id_;
+  RTPReceiverVideo* owner_;
+  ForwardErrorCorrection* fec_;
+  // TODO(holmer): In the current version received_packet_list_ is never more
+  // than one packet, since we process FEC every time a new packet
+  // arrives. We should remove the list.
+  ForwardErrorCorrection::ReceivedPacketList received_packet_list_;
+  ForwardErrorCorrection::RecoveredPacketList recovered_packet_list_;
+  int8_t payload_type_fec_;
 };
-} // namespace webrtc
+}  // namespace webrtc
 
-#endif // WEBRTC_MODULES_RTP_RTCP_SOURCE_RECEIVER_FEC_H_
+#endif  // WEBRTC_MODULES_RTP_RTCP_SOURCE_RECEIVER_FEC_H_

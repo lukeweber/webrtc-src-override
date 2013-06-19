@@ -17,7 +17,16 @@ LOCAL_MODULE_CLASS := STATIC_LIBRARIES
 LOCAL_MODULE := libwebrtc_resampler
 LOCAL_MODULE_TAGS := optional
 LOCAL_CPP_EXTENSION := .cc
-LOCAL_SRC_FILES := resampler.cc
+LOCAL_SRC_FILES := \
+	resampler.cc \
+	push_resampler.cc \
+	push_sinc_resampler.cc \
+	sinc_resampler.cc
+
+ifeq ($(TARGET_ARCH_ABI),x86)
+LOCAL_SRC_FILES += \
+	sinc_resampler_sse.cc
+endif
 
 # Flags passed to both C and C++ files.
 LOCAL_CFLAGS := \

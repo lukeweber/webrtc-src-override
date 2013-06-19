@@ -10,7 +10,7 @@
 
 #include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
 
-#include "gtest/gtest.h"
+#include "testing/gtest/include/gtest/gtest.h"
 #include "webrtc/system_wrappers/interface/sleep.h"
 #include "webrtc/system_wrappers/interface/thread_wrapper.h"
 #include "webrtc/system_wrappers/interface/trace.h"
@@ -138,7 +138,7 @@ TEST_F(CritSectTest, ThreadWakesTwice) {
 
   thread->SetNotAlive();  // Tell thread to exit once run function finishes.
   SwitchProcess();
-  EXPECT_LT(count_before, count.Count());
+  EXPECT_TRUE(WaitForCount(count_before + 1, &count));
   EXPECT_TRUE(thread->Stop());
   delete thread;
   delete crit_sect;

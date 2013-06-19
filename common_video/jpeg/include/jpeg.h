@@ -11,9 +11,9 @@
 #ifndef WEBRTC_COMMON_VIDEO_JPEG
 #define WEBRTC_COMMON_VIDEO_JPEG
 
-#include "typedefs.h"
-#include "common_video/interface/i420_video_frame.h"
-#include "common_video/interface/video_image.h"  // EncodedImage
+#include "webrtc/common_video/interface/i420_video_frame.h"
+#include "webrtc/common_video/interface/video_image.h"  // EncodedImage
+#include "webrtc/typedefs.h"
 
 // jpeg forward declaration
 struct jpeg_compress_struct;
@@ -36,7 +36,7 @@ public:
 //    Output:
 //    - 0             : OK
 //    - (-1)          : Error
-    WebRtc_Word32 SetFileName(const char* fileName);
+    int32_t SetFileName(const char* fileName);
 
 // Encode an I420 image. The encoded image is saved to a file
 //
@@ -46,7 +46,7 @@ public:
 //    Output:
 //    - 0             : OK
 //    - (-1)          : Error
-    WebRtc_Word32 Encode(const I420VideoFrame& inputImage);
+    int32_t Encode(const I420VideoFrame& inputImage);
 
 private:
 

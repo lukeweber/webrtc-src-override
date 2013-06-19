@@ -15,17 +15,17 @@
 // It also uses the static UdpSocketManager object.
 // The most important property of these tests is that they do not leak memory.
 
-#include "gtest/gtest.h"
-#include "webrtc/test/channel_transport/udp_socket_wrapper.h"
-#include "webrtc/test/channel_transport/udp_socket_manager_wrapper.h"
+#include "testing/gtest/include/gtest/gtest.h"
 #include "webrtc/system_wrappers/interface/trace.h"
+#include "webrtc/test/channel_transport/udp_socket_manager_wrapper.h"
+#include "webrtc/test/channel_transport/udp_socket_wrapper.h"
 
 namespace webrtc {
 namespace test {
 
 TEST(UdpSocketManager, CreateCallsInitAndDoesNotLeakMemory) {
-  WebRtc_Word32 id = 42;
-  WebRtc_UWord8 threads = 1;
+  int32_t id = 42;
+  uint8_t threads = 1;
   UdpSocketManager* mgr = UdpSocketManager::Create(id, threads);
   // Create is supposed to have called init on the object.
   EXPECT_FALSE(mgr->Init(id, threads))
@@ -36,8 +36,8 @@ TEST(UdpSocketManager, CreateCallsInitAndDoesNotLeakMemory) {
 // Creates a socket and adds it to the socket manager, and then removes it
 // before destroying the socket manager.
 TEST(UdpSocketManager, AddAndRemoveSocketDoesNotLeakMemory) {
-  WebRtc_Word32 id = 42;
-  WebRtc_UWord8 threads = 1;
+  int32_t id = 42;
+  uint8_t threads = 1;
   UdpSocketManager* mgr = UdpSocketManager::Create(id, threads);
   UdpSocketWrapper* socket =
       UdpSocketWrapper::CreateSocket(id,
@@ -61,8 +61,8 @@ TEST(UdpSocketManager, UnremovedSocketsGetCollectedAtManagerDeletion) {
 #if defined(_WIN32)
   // It's hard to test an infinite wait, so we don't.
 #else
-  WebRtc_Word32 id = 42;
-  WebRtc_UWord8 threads = 1;
+  int32_t id = 42;
+  uint8_t threads = 1;
   UdpSocketManager* mgr = UdpSocketManager::Create(id, threads);
   UdpSocketWrapper* unused_socket = UdpSocketWrapper::CreateSocket(
       id,

@@ -11,16 +11,15 @@
 #ifndef WEBRTC_VOICE_ENGINE_TRANSMIT_MIXER_H
 #define WEBRTC_VOICE_ENGINE_TRANSMIT_MIXER_H
 
-#include "common_types.h"
-#include "voe_base.h"
-#include "file_player.h"
-#include "file_recorder.h"
-#include "level_indicator.h"
-#include "module_common_types.h"
-#include "monitor_module.h"
-#include "resampler.h"
-#include "voice_engine_defines.h"
-
+#include "webrtc/common_audio/resampler/include/push_resampler.h"
+#include "webrtc/common_types.h"
+#include "webrtc/modules/interface/module_common_types.h"
+#include "webrtc/modules/utility/interface/file_player.h"
+#include "webrtc/modules/utility/interface/file_recorder.h"
+#include "webrtc/voice_engine/include/voe_base.h"
+#include "webrtc/voice_engine/level_indicator.h"
+#include "webrtc/voice_engine/monitor_module.h"
+#include "webrtc/voice_engine/voice_engine_defines.h"
 
 namespace webrtc {
 
@@ -40,37 +39,37 @@ class TransmitMixer : public MonitorObserver,
 
 {
 public:
-    static WebRtc_Word32 Create(TransmitMixer*& mixer,
-                                const WebRtc_UWord32 instanceId);
+    static int32_t Create(TransmitMixer*& mixer, uint32_t instanceId);
 
     static void Destroy(TransmitMixer*& mixer);
 
-    WebRtc_Word32 SetEngineInformation(ProcessThread& processThread,
-                                       Statistics& engineStatistics,
-                                       ChannelManager& channelManager);
+    int32_t SetEngineInformation(ProcessThread& processThread,
+                                 Statistics& engineStatistics,
+                                 ChannelManager& channelManager);
 
-    WebRtc_Word32 SetAudioProcessingModule(
+    int32_t SetAudioProcessingModule(
         AudioProcessing* audioProcessingModule);
 
-    WebRtc_Word32 PrepareDemux(const void* audioSamples,
-                               const WebRtc_UWord32 nSamples,
-                               const WebRtc_UWord8  nChannels,
-                               const WebRtc_UWord32 samplesPerSec,
-                               const WebRtc_UWord16 totalDelayMS,
-                               const WebRtc_Word32  clockDrift,
-                               const WebRtc_UWord16 currentMicLevel);
+    int32_t PrepareDemux(const void* audioSamples,
+                         uint32_t nSamples,
+                         uint8_t  nChannels,
+                         uint32_t samplesPerSec,
+                         uint16_t totalDelayMS,
+                         int32_t  clockDrift,
+                         uint16_t currentMicLevel,
+                         bool keyPressed);
 
 
-    WebRtc_Word32 DemuxAndMix();
+    int32_t DemuxAndMix();
 
-    WebRtc_Word32 EncodeAndSend();
+    int32_t EncodeAndSend();
 
-    WebRtc_UWord32 CaptureLevel() const;
+    uint32_t CaptureLevel() const;
 
-    WebRtc_Word32 StopSend();
+    int32_t StopSend();
 
     // VoEDtmf
-    void UpdateMuteMicrophoneTime(const WebRtc_UWord32 lengthMs);
+    void UpdateMuteMicrophoneTime(uint32_t lengthMs);
 
     // VoEExternalMedia
     int RegisterExternalMediaProcessing(VoEMediaProcess* object,
@@ -80,38 +79,38 @@ public:
     int GetMixingFrequency();
 
     // VoEVolumeControl
-    int SetMute(const bool enable);
+    int SetMute(bool enable);
 
     bool Mute() const;
 
-    WebRtc_Word8 AudioLevel() const;
+    int8_t AudioLevel() const;
 
-    WebRtc_Word16 AudioLevelFullRange() const;
+    int16_t AudioLevelFullRange() const;
 
     bool IsRecordingCall();
 
     bool IsRecordingMic();
 
     int StartPlayingFileAsMicrophone(const char* fileName,
-                                     const bool loop,
-                                     const FileFormats format,
-                                     const int startPosition,
-                                     const float volumeScaling,
-                                     const int stopPosition,
+                                     bool loop,
+                                     FileFormats format,
+                                     int startPosition,
+                                     float volumeScaling,
+                                     int stopPosition,
                                      const CodecInst* codecInst);
 
     int StartPlayingFileAsMicrophone(InStream* stream,
-                                     const FileFormats format,
-                                     const int startPosition,
-                                     const float volumeScaling,
-                                     const int stopPosition,
+                                     FileFormats format,
+                                     int startPosition,
+                                     float volumeScaling,
+                                     int stopPosition,
                                      const CodecInst* codecInst);
 
     int StopPlayingFileAsMicrophone();
 
     int IsPlayingFileAsMicrophone() const;
 
-    int ScaleFileAsMicrophonePlayout(const float scale);
+    int ScaleFileAsMicrophonePlayout(float scale);
 
     int StartRecordingMicrophone(const char* fileName,
                                  const CodecInst* codecInst);
@@ -129,7 +128,7 @@ public:
 
     void SetMixWithMicStatus(bool mix);
 
-    WebRtc_Word32 RegisterVoiceEngineObserver(VoiceEngineObserver& observer);
+    int32_t RegisterVoiceEngineObserver(VoiceEngineObserver& observer);
 
     virtual ~TransmitMixer();
 
@@ -138,15 +137,15 @@ public:
 
 
     // FileCallback
-    void PlayNotification(const WebRtc_Word32 id,
-                          const WebRtc_UWord32 durationMs);
+    void PlayNotification(int32_t id,
+                          uint32_t durationMs);
 
-    void RecordNotification(const WebRtc_Word32 id,
-                            const WebRtc_UWord32 durationMs);
+    void RecordNotification(int32_t id,
+                            uint32_t durationMs);
 
-    void PlayFileEnded(const WebRtc_Word32 id);
+    void PlayFileEnded(int32_t id);
 
-    void RecordFileEnded(const WebRtc_Word32 id);
+    void RecordFileEnded(int32_t id);
 
 #ifdef WEBRTC_VOICE_ENGINE_TYPING_DETECTION
     // Typing detection
@@ -162,7 +161,7 @@ public:
   bool IsStereoChannelSwappingEnabled();
 
 private:
-    TransmitMixer(const WebRtc_UWord32 instanceId);
+    TransmitMixer(uint32_t instanceId);
 
     // Gets the maximum sample rate and number of channels over all currently
     // sending codecs.
@@ -172,15 +171,15 @@ private:
                            int nSamples,
                            int nChannels,
                            int samplesPerSec);
-    WebRtc_Word32 RecordAudioToFile(const WebRtc_UWord32 mixingFrequency);
+    int32_t RecordAudioToFile(uint32_t mixingFrequency);
 
-    WebRtc_Word32 MixOrReplaceAudioWithFile(
-        const int mixingFrequency);
+    int32_t MixOrReplaceAudioWithFile(
+        int mixingFrequency);
 
     void ProcessAudio(int delay_ms, int clock_drift, int current_mic_level);
 
 #ifdef WEBRTC_VOICE_ENGINE_TYPING_DETECTION
-    int TypingDetection();
+    int TypingDetection(bool keyPressed);
 #endif
 
     // uses
@@ -193,7 +192,7 @@ private:
     // owns
     MonitorModule _monitorModule;
     AudioFrame _audioFrame;
-    Resampler _audioResampler; // ADM sample rate -> mixing rate
+    PushResampler resampler_;  // ADM sample rate -> mixing rate
     FilePlayer* _filePlayerPtr;
     FileRecorder* _fileRecorderPtr;
     FileRecorder* _fileCallRecorderPtr;
@@ -209,9 +208,9 @@ private:
     CriticalSectionWrapper& _callbackCritSect;
 
 #ifdef WEBRTC_VOICE_ENGINE_TYPING_DETECTION
-    WebRtc_Word32 _timeActive;
-    WebRtc_Word32 _timeSinceLastTyping;
-    WebRtc_Word32 _penaltyCounter;
+    int32_t _timeActive;
+    int32_t _timeSinceLastTyping;
+    int32_t _penaltyCounter;
     bool _typingNoiseWarning;
 
     // Tunable treshold values
@@ -226,11 +225,11 @@ private:
 
     int _instanceId;
     bool _mixFileWithMicrophone;
-    WebRtc_UWord32 _captureLevel;
+    uint32_t _captureLevel;
     VoEMediaProcess* external_postproc_ptr_;
     VoEMediaProcess* external_preproc_ptr_;
     bool _mute;
-    WebRtc_Word32 _remainingMuteMicTimeMs;
+    int32_t _remainingMuteMicTimeMs;
     bool stereo_codec_;
     bool swap_stereo_channels_;
 };

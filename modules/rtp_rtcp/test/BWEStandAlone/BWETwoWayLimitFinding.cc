@@ -8,8 +8,8 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "BWETwoWayLimitFinding.h"
-#include "TestLoadGenerator.h"
+#include "webrtc/modules/rtp_rtcp/test/BWEStandAlone/BWETwoWayLimitFinding.h"
+#include "webrtc/modules/rtp_rtcp/test/BWEStandAlone/TestLoadGenerator.h"
 
 
 BWETwoWayLimitFinding::BWETwoWayLimitFinding(
@@ -38,7 +38,7 @@ BWETwoWayLimitFinding::~BWETwoWayLimitFinding()
 }
 
 
-int BWETwoWayLimitFinding::Init(std::string ip, WebRtc_UWord16 port)
+int BWETwoWayLimitFinding::Init(std::string ip, uint16_t port)
 {
     // create the load generator object
     const int rtpSampleRate = 90000;
@@ -64,7 +64,7 @@ bool BWETwoWayLimitFinding::StoppingCriterionMaster()
         _forwLimitReached = true;
     }
 
-    WebRtc_Word32 revRateKbps = _sendrec->ReceiveBitrateKbps();
+    int32_t revRateKbps = _sendrec->ReceiveBitrateKbps();
     if (revRateKbps > (0.95 * _incomingAvailBWkbps))
     {
         _revLimitReached = true;
@@ -72,4 +72,3 @@ bool BWETwoWayLimitFinding::StoppingCriterionMaster()
 
     return (_forwLimitReached && _revLimitReached);
 }
-

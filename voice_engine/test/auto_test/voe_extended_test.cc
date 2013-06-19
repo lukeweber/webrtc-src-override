@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "webrtc/test/testsupport/fileutils.h"
+#include "webrtc/voice_engine/test/auto_test/voe_test_defines.h"
 #include "webrtc/voice_engine/voice_engine_defines.h"
 
 #if defined(_WIN32)
@@ -169,7 +170,7 @@ void XRTPObserver::OnIncomingCSRCChanged(const int /*channel*/, const unsigned i
                                          const bool /*added*/) {
 }
 
-void XRTPObserver::OnIncomingSSRCChanged(const int /*channel*/, const unsigned int SSRC) {
+void XRTPObserver::OnIncomingSSRCChanged(const int /*channel*/, unsigned int SSRC) {
   // char msg[128];
   // sprintf(msg, "OnIncomingSSRCChanged(channel=%d, SSRC=%lu)\n",
   //        channel, SSRC);
@@ -199,7 +200,7 @@ int VoEExtendedTest::TestPassed(const char* str) const {
   return 0;
 }
 
-void VoEExtendedTest::OnPeriodicDeadOrAlive(const int /*channel*/, const bool alive) {
+void VoEExtendedTest::OnPeriodicDeadOrAlive(const int /*channel*/, bool alive) {
   _alive = alive;
   if (alive) {
     TEST_LOG("=> ALIVE ");
@@ -209,7 +210,7 @@ void VoEExtendedTest::OnPeriodicDeadOrAlive(const int /*channel*/, const bool al
   fflush(NULL);
 }
 
-void VoEExtendedTest::CallbackOnError(const int errCode, int) {
+void VoEExtendedTest::CallbackOnError(int errCode, int) {
   _errCode = errCode;
   TEST_LOG("\n************************\n");
   TEST_LOG(" RUNTIME ERROR: %d \n", errCode);
@@ -2902,7 +2903,6 @@ int VoEExtendedTest::TestEncryption() {
 
   VoEBase* voe_base_ = _mgr.BasePtr();
   VoEFile* file = _mgr.FilePtr();
-  VoEEncryption* encrypt = _mgr.EncryptionPtr();
   VoENetwork* voe_network = _mgr.NetworkPtr();
 
 #ifdef _USE_EXTENDED_TRACE_
@@ -2929,474 +2929,17 @@ int VoEExtendedTest::TestEncryption() {
   TEST_MUSTPASS(file->StartPlayingFileAsMicrophone(0, _mgr.AudioFilename(),
           true, true));
 
-    ///////////////////////////
+  ///////////////////////////
   // Actual test starts here
 
-  unsigned char key1[30] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6,
-      7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
-
-#ifdef WEBRTC_SRTP
-  unsigned char key2[30]; // Different than key1 in first position
-  memcpy(key2, key1, 30);
-  key2[0] = 99;
-  unsigned char key3[30]; // Different than key1 in last position
-  memcpy(key3, key1, 30);
-  key3[29] = 99;
-  unsigned char key4[29]; // Same as key1 but shorter
-  memcpy(key4, key1, 29);
-
-  TEST(SRTP - Fail tests); ANL();
-
-  // Send
-  // Incorrect parameters when not all protection is enabled
-  TEST_MUSTPASS(!encrypt->EnableSRTPSend(0, kCipherNull, 30, kAuthHmacSha1,
-          20, 4, kNoProtection, key1));
-  TEST_MUSTPASS(VE_SRTP_ERROR != voe_base_->LastError());
-  MARK();
-  TEST_MUSTPASS(!encrypt->EnableSRTPSend(0, kCipherNull, 30, kAuthHmacSha1,
-          20, 4, kEncryption key1));
-  TEST_MUSTPASS(VE_SRTP_ERROR != voe_base_->LastError());
-  MARK();
-  TEST_MUSTPASS(!encrypt->EnableSRTPSend(0, kCipherNull, 30, kAuthHmacSha1,
-          20, 4, kAuthentication, key1));
-  TEST_MUSTPASS(VE_SRTP_ERROR != voe_base_->LastError());
-  MARK();
-  // Incorrect cipher key length
-  TEST_MUSTPASS(!encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 15,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication, key1));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-  TEST_MUSTPASS(!encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 257,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication, key1));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-  TEST_MUSTPASS(!encrypt->EnableSRTPSend(0, kCipherNull, 15, kAuthHmacSha1,
-          20, 4, kEncryptionAndAuthentication,
-          key1));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-  TEST_MUSTPASS(!encrypt->EnableSRTPSend(0, kCipherNull, 257, kAuthHmacSha1,
-          20, 4, kEncryptionAndAuthentication,
-          key1));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-  // Incorrect auth key length
-  TEST_MUSTPASS(!encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 21, 4,
-          kEncryptionAndAuthentication, key1));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-  TEST_MUSTPASS(!encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthNull, 257, 4,
-          kEncryptionAndAuthentication, key1));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-  // Incorrect auth tag length
-  TEST_MUSTPASS(!encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 21,
-          kEncryptionAndAuthentication, key1));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-  TEST_MUSTPASS(!encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthNull, 20, 13,
-          kEncryptionAndAuthentication, key1));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-
-  // key NULL pointer
-  TEST_MUSTPASS(!encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication, NULL));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-
-  // Same for receive
-  // Incorrect parameters when not all protection is enabled
-  TEST_MUSTPASS(!encrypt->EnableSRTPReceive(0, kCipherNull, 30, kAuthHmacSha1,
-          20, 4, kNoProtection, key1));
-  TEST_MUSTPASS(VE_SRTP_ERROR != voe_base_->LastError());
-  MARK();
-  TEST_MUSTPASS(!encrypt->EnableSRTPReceive(0, kCipherNull, 30, kAuthHmacSha1,
-          20, 4, kEncryption key1));
-  TEST_MUSTPASS(VE_SRTP_ERROR != voe_base_->LastError());
-  MARK();
-  TEST_MUSTPASS(!encrypt->EnableSRTPReceive(0, kCipherNull, 30, kAuthHmacSha1,
-          20, 4, kAuthentication, key1));
-  TEST_MUSTPASS(VE_SRTP_ERROR != voe_base_->LastError());
-  MARK();
-  // Incorrect cipher key length
-  TEST_MUSTPASS(!encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 15,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication,
-          key1));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-  TEST_MUSTPASS(!encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 257,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication,
-          key1));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-  TEST_MUSTPASS(!encrypt->EnableSRTPReceive(0, kCipherNull, 15,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication,
-          key1));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-  TEST_MUSTPASS(!encrypt->EnableSRTPReceive(0, kCipherNull, 257,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication,
-          key1));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-  // Incorrect auth key length
-  TEST_MUSTPASS(!encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode,
-          30, kAuthHmacSha1, 21, 4,
-          kEncryptionAndAuthentication,
-          key1));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-  // it crashed the application
-  TEST_MUSTPASS(!encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthNull, 257, 4,
-          kEncryptionAndAuthentication,
-          key1));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-  // Incorrect auth tag length
-  TEST_MUSTPASS(!encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 21,
-          kEncryptionAndAuthentication,
-          key1));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-  // it crashed the application
-  TEST_MUSTPASS(!encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthNull, 20, 13,
-          kEncryptionAndAuthentication,
-          key1));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-  // key NULL pointer
-  TEST_MUSTPASS(!encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication,
-          NULL));
-  TEST_MUSTPASS(VE_INVALID_ARGUMENT != voe_base_->LastError());
-  MARK();
-  ANL();
-
-  TEST(SRTP - Should hear audio at all time); ANL();
-
-  // Authentication only
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherNull, 0, kAuthHmacSha1, 20,
-          4, kAuthentication, key1));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherNull, 0, kAuthHmacSha1,
-          20, 4, kAuthentication, key1));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  MARK(); SleepMs(2000);
-  ANL();
-
-  // No protection
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherNull, 0, kAuthNull, 0, 0,
-          kNoProtection, key1));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherNull, 0, kAuthNull, 0, 0,
-          kNoProtection, key1));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  MARK(); SleepMs(2000);
-
-  // Encryption only
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthNull, 0, 0, kEncryption key1));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthNull, 0, 0,
-          kEncryption key1));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  MARK(); SleepMs(2000);
-
-  // Authentication only
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherNull, 0, kAuthHmacSha1, 20,
-          4, kAuthentication, key1));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherNull, 0, kAuthHmacSha1,
-          20, 4, kAuthentication, key1));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  MARK(); SleepMs(2000);
-  ANL();
-
-  // Switching between keys
-  TEST(SRTP - Different keys - should hear audio at all time); ANL();
-
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication, key2));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication,
-          key2));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication, key1));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication,
-          key1));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication, key1));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication,
-          key1));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(voe_base_->StopPlayout(0));
-  TEST_MUSTPASS(voe_base_->StopSend(0));
-  TEST_MUSTPASS(voe_base_->StopReceive(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication, key2));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication,
-          key2));
-  TEST_MUSTPASS(voe_base_->SetLocalReceiver(0, 8000));
-  TEST_MUSTPASS(voe_base_->SetSendDestination(0, 8000, "127.0.0.1"));
-  TEST_MUSTPASS(voe_base_->StartReceive(0));
-  TEST_MUSTPASS(voe_base_->StartPlayout(0));
-  TEST_MUSTPASS(voe_base_->StartSend(0));
-  TEST_MUSTPASS(file->StartPlayingFileAsMicrophone(0, _mgr.AudioFilename(),
-          true, true));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  MARK(); SleepMs(2000);
-  ANL();
-
-  // Testing different keys that should be silent
-  TEST(SRTP - Should be silent or garbage); ANL();
-
-  // key1 and key2
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication, key1));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication,
-          key2));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication, key2));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication,
-          key1));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthNull, 0, 0, kEncryption key1));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthNull, 0, 0,
-          kEncryption key2));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherNull, 0, kAuthHmacSha1,
-          20, 4, kAuthentication, key1));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherNull, 0, kAuthHmacSha1,
-          20, 4, kAuthentication, key2));
-  MARK(); SleepMs(2000);
-
-  // key1 and key3
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication, key1));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication,
-          key3));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication, key3));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication,
-          key1));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthNull, 0, 0, kEncryption key1));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthNull, 0, 0,
-          kEncryption key3));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherNull, 0, kAuthHmacSha1, 20,
-          4, kAuthentication, key1));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherNull, 0, kAuthHmacSha1,
-          20, 4, kAuthentication, key3));
-  MARK(); SleepMs(2000);
-
-  // key1 and key4
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication, key1));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication,
-          key4));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication, key4));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1, 20, 4,
-          kEncryptionAndAuthentication,
-          key1));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthNull, 0, 0, kEncryption key1));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthNull, 0, 0,
-          kEncryption key4));
-  MARK(); SleepMs(2000);
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherNull, 0, kAuthHmacSha1, 20,
-          4, kAuthentication, key1));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherNull, 0, kAuthHmacSha1,
-          20, 4, kAuthentication, key4));
-  MARK(); SleepMs(2000);
-  ANL();
-
-  // Back to normal
-  TEST(SRTP - Back to normal - should hear audio); ANL();
-
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  MARK(); SleepMs(2000);
-  ANL();
-
-  // SRTCP tests
-  TEST(SRTCP - Ignore voice or not); ANL();
-  VoERTP_RTCP* rtp_rtcp = _mgr.RTP_RTCPPtr();
-  char tmpStr[32];
-
-  // First test that RTCP packet is received and OK without encryption
-
-  TEST_MUSTPASS(rtp_rtcp->SetRTCP_CNAME(0, "Henrik1"));
-  MARK(); SleepMs(8000);
-  TEST_MUSTPASS(rtp_rtcp->GetRemoteRTCP_CNAME(0, tmpStr));
-  TEST_MUSTPASS(_stricmp("Henrik1", tmpStr));
-
-  // Enable SRTP and SRTCP send and receive
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1,
-          20, 4, kEncryptionAndAuthentication, key1, true));
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1,
-          20, 4, kEncryptionAndAuthentication, key1, true));
-  TEST_MUSTPASS(rtp_rtcp->SetRTCP_CNAME(0, "Henrik2"));
-  MARK(); SleepMs(8000);
-  TEST_MUSTPASS(rtp_rtcp->GetRemoteRTCP_CNAME(0, tmpStr));
-  TEST_MUSTPASS(_stricmp("Henrik2", tmpStr));
-
-  // Disable SRTP and SRTCP send
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(rtp_rtcp->SetRTCP_CNAME(0, "Henrik3"));
-  MARK(); SleepMs(8000);
-  TEST_MUSTPASS(rtp_rtcp->GetRemoteRTCP_CNAME(0, tmpStr));
-  TEST_MUSTPASS(_stricmp("Henrik2", tmpStr)); // Should not have changed
-
-  // Enable SRTP send, but disable SRTCP send
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1,
-          20, 4, kEncryptionAndAuthentication, key1));
-  TEST_MUSTPASS(rtp_rtcp->SetRTCP_CNAME(0, "Henrik4"));
-  MARK(); SleepMs(8000);
-  TEST_MUSTPASS(rtp_rtcp->GetRemoteRTCP_CNAME(0, tmpStr));
-  TEST_MUSTPASS(_stricmp("Henrik2", tmpStr)); // Should not have changed
-
-  // Enable SRTP and SRTCP send, disable SRTP and SRTCP receive
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->EnableSRTPSend(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1,
-          20, 4, kEncryptionAndAuthentication, key1, true));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  TEST_MUSTPASS(rtp_rtcp->SetRTCP_CNAME(0, "Henrik5"));
-  MARK(); SleepMs(8000);
-  TEST_MUSTPASS(rtp_rtcp->GetRemoteRTCP_CNAME(0, tmpStr));
-  TEST_MUSTPASS(_stricmp("Henrik2", tmpStr)); // Should not have changed
-
-  // Enable SRTP receive, but disable SRTCP receive
-  TEST_MUSTPASS(encrypt->EnableSRTPReceive(0, kCipherAes128CounterMode, 30,
-          kAuthHmacSha1,
-          20, 4, kEncryptionAndAuthentication, key1));
-  TEST_MUSTPASS(rtp_rtcp->SetRTCP_CNAME(0, "Henrik6"));
-  MARK(); SleepMs(8000);
-  TEST_MUSTPASS(rtp_rtcp->GetRemoteRTCP_CNAME(0, tmpStr));
-  TEST_MUSTPASS(_stricmp("Henrik2", tmpStr)); // Should not have changed
-
-  // Disable all
-  TEST_MUSTPASS(encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(encrypt->DisableSRTPReceive(0));
-  TEST_MUSTPASS(rtp_rtcp->SetRTCP_CNAME(0, "Henrik7"));
-  MARK(); SleepMs(8000);
-  TEST_MUSTPASS(rtp_rtcp->GetRemoteRTCP_CNAME(0, tmpStr));
-  TEST_MUSTPASS(_stricmp("Henrik7", tmpStr));
-  ANL();
-
-#else
   TEST(SRTP disabled - Fail tests);
   ANL();
 
-  TEST_MUSTPASS(!encrypt->EnableSRTPSend(0, kCipherNull, 30, kAuthHmacSha1,
-          20, 4, kEncryptionAndAuthentication, key1));
-  TEST_MUSTPASS(VE_FUNC_NOT_SUPPORTED != voe_base_->LastError());
-  TEST_MUSTPASS(!encrypt->EnableSRTPReceive(0, kCipherNull, 30, kAuthHmacSha1,
-          20, 4, kEncryptionAndAuthentication, key1));
-  TEST_MUSTPASS(VE_FUNC_NOT_SUPPORTED != voe_base_->LastError());
-  TEST_MUSTPASS(!encrypt->DisableSRTPSend(0));
-  TEST_MUSTPASS(VE_FUNC_NOT_SUPPORTED != voe_base_->LastError());
-  TEST_MUSTPASS(!encrypt->DisableSRTPReceive(0));
-  TEST_MUSTPASS(VE_FUNC_NOT_SUPPORTED != voe_base_->LastError());
-  ANL();
-#endif
-  AOK();
+  // TODO(solenberg): Test should verify that external encryption policy
+  // registration works, i.e.:
+  // VoEEncryption* encrypt = _mgr.EncryptionPtr();
+  // encrypt->RegisterExternalEncryption() and
+  // encrypt->DeRegisterExternalEncryption().
 
   TEST_MUSTPASS(file->StopPlayingFileAsMicrophone(0));
   TEST_MUSTPASS(voe_base_->StopSend(0));
@@ -3444,7 +2987,7 @@ int VoEExtendedTest::TestExternalMedia() {
   TEST_MUSTPASS(voe_base_->StartSend(0));
 
   int getLen = 0;
-  WebRtc_Word16 vector[32000];
+  int16_t vector[32000];
   memset(vector, 0, 32000 * sizeof(short));
 
 #ifdef WEBRTC_VOE_EXTERNAL_REC_AND_PLAYOUT
@@ -4982,11 +4525,13 @@ int VoEExtendedTest::TestRTP_RTCP() {
   TEST_MUSTPASS(-1 != rtp_rtcp->SetRTPAudioLevelIndicationStatus(0, true, 15));
   MARK();
   TEST_ERROR(VE_INVALID_ARGUMENT);
-  TEST_MUSTPASS(-1 != rtp_rtcp->SetRTPAudioLevelIndicationStatus(0, false, 15));
-  MARK();
   TEST_MUSTPASS(-1 != rtp_rtcp->SetRTPAudioLevelIndicationStatus(1, true, 5));
   MARK();
   TEST_ERROR(VE_CHANNEL_NOT_VALID);
+
+  // test any id can be used on disabling.
+  TEST_MUSTPASS(0 != rtp_rtcp->SetRTPAudioLevelIndicationStatus(0, false, 0));
+  MARK();
 
   // test complete valid input range [1,14]
   bool audioLevelEnabled(false);
@@ -5062,13 +4607,12 @@ int VoEExtendedTest::TestRTP_RTCP() {
   TEST_MUSTPASS(network->DeRegisterExternalTransport(1));
   TEST_MUSTPASS(voe_base_->DeleteChannel(0));
   TEST_MUSTPASS(voe_base_->DeleteChannel(1));
+  voice_channel_transport.reset(NULL);
 
   TEST_MUSTPASS(voe_base_->CreateChannel());
-
   voice_channel_transport.reset(new VoiceChannelTransport(network, 0));
-
-  voice_channel_transport->SetSendDestination("127.0.0.1", 12345);
-  voice_channel_transport->SetLocalReceiver(12345);
+  voice_channel_transport->SetSendDestination("127.0.0.1", 12347);
+  voice_channel_transport->SetLocalReceiver(12347);
 
   TEST_MUSTPASS(voe_base_->StartReceive(0));
   TEST_MUSTPASS(voe_base_->StartSend(0));
@@ -5229,13 +4773,13 @@ int VoEExtendedTest::TestRTP_RTCP() {
   TEST_MUSTPASS(voe_base_->StopPlayout(0));
   TEST_MUSTPASS(voe_base_->StopReceive(0));
   TEST_MUSTPASS(voe_base_->DeleteChannel(0));
+  voice_channel_transport.reset(NULL);
 
   SleepMs(100);
 
   TEST_MUSTPASS(voe_base_->CreateChannel());
 
   voice_channel_transport.reset(new VoiceChannelTransport(network, 0));
-
   voice_channel_transport->SetSendDestination("127.0.0.1", 12345);
   voice_channel_transport->SetLocalReceiver(12345);
 
@@ -5286,12 +4830,10 @@ int VoEExtendedTest::TestRTP_RTCP() {
   TEST_MUSTPASS((NTPHigh == NTPHigh2) && (NTPLow == NTPLow2));
   TEST_MUSTPASS(timestamp == timestamp2);
   TEST_MUSTPASS(playoutTimestamp == playoutTimestamp2);
-
+  CodecInst cinst;
 #ifdef WEBRTC_CODEC_RED
-  //The following test is related to defect 4985 and 4986
   TEST_LOG("Turn FEC and VAD on and wait for 4 seconds and ensure that "
     "the jitter is still small...");
-  CodecInst cinst;
 #if (!defined(WEBRTC_IOS) && !defined(WEBRTC_ANDROID))
   cinst.pltype = 104;
   strcpy(cinst.plname, "isac");
@@ -5315,7 +4857,7 @@ int VoEExtendedTest::TestRTP_RTCP() {
   TEST_MUSTPASS(voe_base_->StartSend(0));
   TEST_MUSTPASS(voe_base_->StartReceive(0));
   TEST_MUSTPASS(voe_base_->StartPlayout(0));
-  TEST_MUSTPASS(rtp_rtcp->SetFECStatus(0, true, -1));
+  TEST_MUSTPASS(rtp_rtcp->SetFECStatus(0, true, 126));
   MARK();
   TEST_MUSTPASS(codec->SetVADStatus(0,true));
   SleepMs(4000);
@@ -5328,8 +4870,8 @@ int VoEExtendedTest::TestRTP_RTCP() {
   TEST_MUSTPASS(jitter2 > 1000)
   TEST_MUSTPASS(rtp_rtcp->SetFECStatus(0, false));
   MARK();
-  //4985 and 4986 end
 #endif // #ifdef WEBRTC_CODEC_RED
+
   TEST(GetRTPStatistics);
   ANL();
   // Statistics summarized on local side based on received RTP packets.
@@ -5484,9 +5026,9 @@ int VoEExtendedTest::TestRTP_RTCP() {
   // We have to re-register the audio codec payload type as stopReceive will
   // clean the database
   TEST_MUSTPASS(codec->SetRecPayloadType(0, cinst));
+  voice_channel_transport.reset(NULL);
 
   voice_channel_transport.reset(new VoiceChannelTransport(network, 0));
-
   voice_channel_transport->SetSendDestination("127.0.0.1", 8000);
   voice_channel_transport->SetLocalReceiver(8000);
 

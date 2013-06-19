@@ -8,7 +8,7 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "testsupport/frame_reader.h"
+#include "webrtc/test/testsupport/frame_reader.h"
 
 #include <cassert>
 
@@ -58,7 +58,7 @@ void FrameReaderImpl::Close() {
   }
 }
 
-bool FrameReaderImpl::ReadFrame(WebRtc_UWord8* source_buffer) {
+bool FrameReaderImpl::ReadFrame(uint8_t* source_buffer) {
   assert(source_buffer);
   if (input_file_ == NULL) {
     fprintf(stderr, "FrameReader is not initialized (input file is NULL)\n");

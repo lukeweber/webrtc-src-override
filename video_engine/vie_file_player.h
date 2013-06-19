@@ -14,12 +14,12 @@
 #include <list>
 #include <set>
 
-#include "common_types.h"  // NOLINT
-#include "common_video/interface/i420_video_frame.h"
-#include "modules/media_file/interface/media_file_defines.h"
-#include "system_wrappers/interface/file_wrapper.h"
-#include "typedefs.h"  // NOLINT
-#include "video_engine/vie_frame_provider_base.h"
+#include "webrtc/common_types.h"
+#include "webrtc/common_video/interface/i420_video_frame.h"
+#include "webrtc/modules/media_file/interface/media_file_defines.h"
+#include "webrtc/system_wrappers/interface/file_wrapper.h"
+#include "webrtc/typedefs.h"
+#include "webrtc/video_engine/vie_frame_provider_base.h"
 
 namespace webrtc {
 
@@ -84,12 +84,12 @@ class ViEFilePlayer
   }
 
   // Implements FileCallback.
-  virtual void PlayNotification(const WebRtc_Word32 /*id*/,
-                                const WebRtc_UWord32 /*notification_ms*/) {}
-  virtual void RecordNotification(const WebRtc_Word32 /*id*/,
-                                  const WebRtc_UWord32 /*notification_ms*/) {}
-  virtual void PlayFileEnded(const WebRtc_Word32 id);
-  virtual void RecordFileEnded(const WebRtc_Word32 /*id*/) {}
+  virtual void PlayNotification(const int32_t /*id*/,
+                                const uint32_t /*notification_ms*/) {}
+  virtual void RecordNotification(const int32_t /*id*/,
+                                  const uint32_t /*notification_ms*/) {}
+  virtual void PlayFileEnded(const int32_t id);
+  virtual void RecordFileEnded(const int32_t /*id*/) {}
 
  private:
   static const int kMaxDecodedAudioLength = 320;
@@ -120,7 +120,7 @@ class ViEFilePlayer
   // Thread for decoding video (and audio if no audio clients connected).
   ThreadWrapper* decode_thread_;
   EventWrapper* decode_event_;
-  WebRtc_Word16 decoded_audio_[kMaxDecodedAudioLength];
+  int16_t decoded_audio_[kMaxDecodedAudioLength];
   int decoded_audio_length_;
 
   // Trick - list containing VoE buffer reading this file. Used if multiple

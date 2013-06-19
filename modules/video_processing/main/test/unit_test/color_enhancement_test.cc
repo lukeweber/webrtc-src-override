@@ -11,11 +11,11 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "common_video/libyuv/include/webrtc_libyuv.h"
-#include "modules/video_processing/main/interface/video_processing.h"
-#include "modules/video_processing/main/test/unit_test/unit_test.h"
-#include "system_wrappers/interface/tick_util.h"
-#include "testsupport/fileutils.h"
+#include "webrtc/common_video/libyuv/include/webrtc_libyuv.h"
+#include "webrtc/modules/video_processing/main/interface/video_processing.h"
+#include "webrtc/modules/video_processing/main/test/unit_test/unit_test.h"
+#include "webrtc/system_wrappers/interface/tick_util.h"
+#include "webrtc/test/testsupport/fileutils.h"
 
 namespace webrtc {
 
@@ -38,7 +38,7 @@ TEST_F(VideoProcessingModuleTest, ColorEnhancement)
     FILE* modFile = fopen(output_file.c_str(), "w+b");
     ASSERT_TRUE(modFile != NULL) << "Could not open output file.\n";
 
-    WebRtc_UWord32 frameNum = 0;
+    uint32_t frameNum = 0;
     scoped_array<uint8_t> video_buffer(new uint8_t[_frame_length]);
     while (fread(video_buffer.get(), 1, _frame_length, _sourceFile) ==
         _frame_length)
@@ -114,7 +114,7 @@ TEST_F(VideoProcessingModuleTest, ColorEnhancement)
     // Verify that all color pixels are enhanced, and no luminance values are
     // altered.
 
-    scoped_array<uint8_t> testFrame(new WebRtc_UWord8[_frame_length]);
+    scoped_array<uint8_t> testFrame(new uint8_t[_frame_length]);
 
     // Use value 128 as probe value, since we know that this will be changed
     // in the enhancement.

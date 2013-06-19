@@ -8,15 +8,15 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "voe_external_media_impl.h"
+#include "webrtc/voice_engine/voe_external_media_impl.h"
 
-#include "channel.h"
-#include "critical_section_wrapper.h"
-#include "output_mixer.h"
-#include "trace.h"
-#include "transmit_mixer.h"
-#include "voice_engine_impl.h"
-#include "voe_errors.h"
+#include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
+#include "webrtc/system_wrappers/interface/trace.h"
+#include "webrtc/voice_engine/channel.h"
+#include "webrtc/voice_engine/include/voe_errors.h"
+#include "webrtc/voice_engine/output_mixer.h"
+#include "webrtc/voice_engine/transmit_mixer.h"
+#include "webrtc/voice_engine/voice_engine_impl.h"
 
 namespace webrtc {
 
@@ -162,7 +162,7 @@ int VoEExternalMediaImpl::SetExternalRecordingStatus(bool enable)
 }
 
 int VoEExternalMediaImpl::ExternalRecordingInsertData(
-        const WebRtc_Word16 speechData10ms[],
+        const int16_t speechData10ms[],
         int lengthSamples,
         int samplingFreqHz,
         int current_delay_ms)
@@ -211,12 +211,12 @@ int VoEExternalMediaImpl::ExternalRecordingInsertData(
         return -1;
     }
 
-    WebRtc_UWord16 blockSize = samplingFreqHz / 100;
-    WebRtc_UWord32 nBlocks = lengthSamples / blockSize;
-    WebRtc_Word16 totalDelayMS = 0;
-    WebRtc_UWord16 playoutDelayMS = 0;
+    uint16_t blockSize = samplingFreqHz / 100;
+    uint32_t nBlocks = lengthSamples / blockSize;
+    int16_t totalDelayMS = 0;
+    uint16_t playoutDelayMS = 0;
 
-    for (WebRtc_UWord32 i = 0; i < nBlocks; i++)
+    for (uint32_t i = 0; i < nBlocks; i++)
     {
         if (!shared_->ext_playout())
         {
@@ -233,18 +233,19 @@ int VoEExternalMediaImpl::ExternalRecordingInsertData(
             // to ExternalPlayoutGetData.
             totalDelayMS = current_delay_ms + playout_delay_ms_;
             // Compensate for block sizes larger than 10ms
-            totalDelayMS -= (WebRtc_Word16)(i*10);
+            totalDelayMS -= (int16_t)(i*10);
             if (totalDelayMS < 0)
                 totalDelayMS = 0;
         }
         shared_->transmit_mixer()->PrepareDemux(
-            (const WebRtc_Word8*)(&speechData10ms[i*blockSize]),
+            (const int8_t*)(&speechData10ms[i*blockSize]),
             blockSize,
             1,
             samplingFreqHz,
             totalDelayMS,
             0,
-            0);
+            0,
+            false); // Typing detection not supported
 
         shared_->transmit_mixer()->DemuxAndMix();
         shared_->transmit_mixer()->EncodeAndSend();
@@ -278,7 +279,7 @@ int VoEExternalMediaImpl::SetExternalPlayoutStatus(bool enable)
 }
 
 int VoEExternalMediaImpl::ExternalPlayoutGetData(
-    WebRtc_Word16 speechData10ms[],
+    int16_t speechData10ms[],
     int samplingFreqHz,
     int current_delay_ms,
     int& lengthSamples)
@@ -323,7 +324,7 @@ int VoEExternalMediaImpl::ExternalPlayoutGetData(
     // Deliver audio (PCM) samples to the external sink
     memcpy(speechData10ms,
            audioFrame.data_,
-           sizeof(WebRtc_Word16)*(audioFrame.samples_per_channel_));
+           sizeof(int16_t)*(audioFrame.samples_per_channel_));
     lengthSamples = audioFrame.samples_per_channel_;
 
     // Store current playout delay (to be used by ExternalRecordingInsertData).

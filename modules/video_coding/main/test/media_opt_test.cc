@@ -21,6 +21,7 @@
 #include "webrtc/modules/video_coding/main/interface/video_coding.h"
 #include "webrtc/modules/video_coding/main/test/test_macros.h"
 #include "webrtc/modules/video_coding/main/test/test_util.h"
+#include "webrtc/test/testsupport/fileutils.h"
 #include "webrtc/test/testsupport/metrics/video_metrics.h"
 
 using namespace webrtc;
@@ -168,7 +169,7 @@ void MediaOptTest::Setup(int testType, CmdArgs& args) {
 void
 MediaOptTest::GeneralSetup()
 {
-    WebRtc_UWord32 minPlayoutDelayMs = 0;
+    uint32_t minPlayoutDelayMs = 0;
 
     if ((_sourceFile = fopen(_inname.c_str(), "rb")) == NULL)
     {
@@ -237,7 +238,7 @@ MediaOptTest::GeneralSetup()
     VideoCodec sendCodec;
     _vcm->InitializeSender();
     _vcm->InitializeReceiver();
-    WebRtc_Word32 numberOfCodecs = _vcm->NumberOfCodecs();
+    int32_t numberOfCodecs = _vcm->NumberOfCodecs();
     if (numberOfCodecs < 1)
     {
         exit(1);
@@ -252,7 +253,7 @@ MediaOptTest::GeneralSetup()
     sendCodec.startBitrate = (int) _bitRate;
     sendCodec.height = _height;
     sendCodec.width = _width;
-    sendCodec.maxFramerate = (WebRtc_UWord8)_frameRate;
+    sendCodec.maxFramerate = (uint8_t)_frameRate;
     _vcm->RegisterSendCodec(&sendCodec, _numberOfCores, 1440);
     _vcm->RegisterReceiveCodec(&sendCodec, _numberOfCores); // same settings for encode and decode
 
@@ -263,7 +264,7 @@ MediaOptTest::GeneralSetup()
 
 
 
-WebRtc_Word32
+int32_t
 MediaOptTest::Perform()
 {
     VCMDecodeCompleteCallback receiveCallback(_decodedFile);
@@ -289,9 +290,9 @@ MediaOptTest::Perform()
 
     // START TEST
     I420VideoFrame sourceFrame;
-    WebRtc_UWord8* tmpBuffer = new WebRtc_UWord8[_lengthSourceFrame];
+    uint8_t* tmpBuffer = new uint8_t[_lengthSourceFrame];
     _vcm->SetChannelParameters(static_cast<uint32_t>(1000 * _bitRate),
-                               (WebRtc_UWord8)_lossRate, _rttMS);
+                               (uint8_t)_lossRate, _rttMS);
     _vcm->RegisterReceiveCallback(&receiveCallback);
 
     _frameCnt  = 0;
@@ -311,14 +312,14 @@ MediaOptTest::Perform()
                                 size_uv, tmpBuffer + size_y + size_uv,
                                 _width, _height,
                                 _width, half_width, half_width);
-        _timeStamp += (WebRtc_UWord32)(9e4 / static_cast<float>(_frameRate));
+        _timeStamp += (uint32_t)(9e4 / static_cast<float>(_frameRate));
         sourceFrame.set_timestamp(_timeStamp);
         TEST(_vcm->AddVideoFrame(sourceFrame) == VCM_OK);
         // inform RTP Module of error resilience features
         //_rtp->SetFECCodeRate(protectionCallback.FECKeyRate(),protectionCallback.FECDeltaRate());
         //_rtp->SetNACKStatus(protectionCallback.NACKMethod());
 
-        WebRtc_Word32 ret = _vcm->Decode();
+        int32_t ret = _vcm->Decode();
         if (ret < 0 )
         {
             TEST(ret == 0);

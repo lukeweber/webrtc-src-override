@@ -51,16 +51,14 @@ bool VCMDecodingState::IsOldFrame(const VCMFrameBuffer* frame) const {
   assert(frame != NULL);
   if (in_initial_state_)
     return false;
-  return (LatestTimestamp(time_stamp_, frame->TimeStamp(), NULL)
-          == time_stamp_);
+  return !IsNewerTimestamp(frame->TimeStamp(), time_stamp_);
 }
 
 bool VCMDecodingState::IsOldPacket(const VCMPacket* packet) const {
   assert(packet != NULL);
   if (in_initial_state_)
     return false;
-  return (LatestTimestamp(time_stamp_, packet->timestamp, NULL)
-           == time_stamp_);
+  return !IsNewerTimestamp(packet->timestamp, time_stamp_);
 }
 
 void VCMDecodingState::SetState(const VCMFrameBuffer* frame) {
@@ -74,31 +72,31 @@ void VCMDecodingState::SetState(const VCMFrameBuffer* frame) {
   in_initial_state_ = false;
 }
 
-void VCMDecodingState::SetStateOneBack(const VCMFrameBuffer* frame) {
-  assert(frame != NULL && frame->GetHighSeqNum() >= 0);
-  sequence_num_ = static_cast<uint16_t>(frame->GetHighSeqNum()) - 1u;
-  time_stamp_ = frame->TimeStamp() - 1u;
-  temporal_id_ = frame->TemporalId();
-  if (frame->PictureId() != kNoPictureId) {
-    if (frame->PictureId() == 0)
-      picture_id_ = 0x7FFF;
-    else
-      picture_id_ =  frame->PictureId() - 1;
-  }
-  if (frame->Tl0PicId() != kNoTl0PicIdx) {
-    if (frame->Tl0PicId() == 0)
-      tl0_pic_id_ = 0x00FF;
-    else
-      tl0_pic_id_ = frame->Tl0PicId() - 1;
-  }
-  in_initial_state_ = false;
+void VCMDecodingState::CopyFrom(const VCMDecodingState& state) {
+  sequence_num_ = state.sequence_num_;
+  time_stamp_ = state.time_stamp_;
+  picture_id_ = state.picture_id_;
+  temporal_id_ = state.temporal_id_;
+  tl0_pic_id_ = state.tl0_pic_id_;
+  full_sync_ = state.full_sync_;
+  in_initial_state_ = state.in_initial_state_;
 }
 
-void VCMDecodingState::UpdateEmptyFrame(const VCMFrameBuffer* frame) {
-  if (ContinuousFrame(frame)) {
-    time_stamp_ = frame->TimeStamp();
-    sequence_num_ = frame->GetHighSeqNum();
+bool VCMDecodingState::UpdateEmptyFrame(const VCMFrameBuffer* frame) {
+  bool empty_packet = frame->GetHighSeqNum() == frame->GetLowSeqNum();
+  if (in_initial_state_ && empty_packet) {
+    // Drop empty packets as long as we are in the initial state.
+    return true;
   }
+  if ((empty_packet && ContinuousSeqNum(frame->GetHighSeqNum())) ||
+      ContinuousFrame(frame)) {
+    // Continuous empty packets or continuous frames can be dropped if we
+    // advance the sequence number.
+    sequence_num_ = frame->GetHighSeqNum();
+    time_stamp_ = frame->TimeStamp();
+    return true;
+  }
+  return false;
 }
 
 void VCMDecodingState::UpdateOldPacket(const VCMPacket* packet) {
@@ -106,7 +104,7 @@ void VCMDecodingState::UpdateOldPacket(const VCMPacket* packet) {
   if (packet->timestamp == time_stamp_) {
     // Late packet belonging to the last decoded frame - make sure we update the
     // last decoded sequence number.
-    sequence_num_ = LatestSequenceNumber(packet->seqNum, sequence_num_, NULL);
+    sequence_num_ = LatestSequenceNumber(packet->seqNum, sequence_num_);
   }
 }
 
@@ -151,8 +149,14 @@ bool VCMDecodingState::ContinuousFrame(const VCMFrameBuffer* frame) const {
   // Return true when in initial state.
   // Note that when a method is not applicable it will return false.
   assert(frame != NULL);
-  if (in_initial_state_)
+  // A key frame is always considered continuous as it doesn't refer to any
+  // frames and therefore won't introduce any errors even if prior frames are
+  // missing.
+  if (frame->FrameType() == kVideoFrameKey)
     return true;
+  // When in the initial state we always require a key frame to start decoding.
+  if (in_initial_state_)
+    return false;
 
   if (!ContinuousLayer(frame->TemporalId(), frame->Tl0PicId())) {
     // Base layers are not continuous or temporal layers are inactive.

@@ -13,23 +13,179 @@
  * This file includes unit tests for the RTCPSender.
  */
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
+#include "testing/gmock/include/gmock/gmock.h"
+#include "testing/gtest/include/gtest/gtest.h"
 
-#include "common_types.h"
-#include "modules/remote_bitrate_estimator/include/remote_bitrate_estimator.h"
-#include "modules/remote_bitrate_estimator/include/mock/mock_remote_bitrate_observer.h"
-#include "modules/rtp_rtcp/source/rtcp_receiver.h"
-#include "modules/rtp_rtcp/source/rtcp_sender.h"
-#include "modules/rtp_rtcp/source/rtp_utility.h"
-#include "modules/rtp_rtcp/source/rtp_rtcp_impl.h"
+#include "webrtc/common_types.h"
+#include "webrtc/modules/remote_bitrate_estimator/include/mock/mock_remote_bitrate_observer.h"
+#include "webrtc/modules/remote_bitrate_estimator/include/remote_bitrate_estimator.h"
+#include "webrtc/modules/rtp_rtcp/interface/rtp_header_parser.h"
+#include "webrtc/modules/rtp_rtcp/source/rtcp_receiver.h"
+#include "webrtc/modules/rtp_rtcp/source/rtcp_sender.h"
+#include "webrtc/modules/rtp_rtcp/source/rtp_rtcp_impl.h"
+#include "webrtc/modules/rtp_rtcp/source/rtp_utility.h"
 
 namespace webrtc {
 
-void CreateRtpPacket(const bool marker_bit, const WebRtc_UWord8 payload,
-    const WebRtc_UWord16 seq_num, const WebRtc_UWord32 timestamp,
-    const WebRtc_UWord32 ssrc, WebRtc_UWord8* array,
-    WebRtc_UWord16* cur_pos) {
+TEST(NACKStringBuilderTest, TestCase1) {
+  NACKStringBuilder builder;
+  builder.PushNACK(5);
+  builder.PushNACK(7);
+  builder.PushNACK(9);
+  builder.PushNACK(10);
+  builder.PushNACK(11);
+  builder.PushNACK(12);
+  builder.PushNACK(15);
+  builder.PushNACK(18);
+  builder.PushNACK(19);
+  EXPECT_EQ(std::string("5,7,9-12,15,18-19"), builder.GetResult());
+}
+
+TEST(NACKStringBuilderTest, TestCase2) {
+  NACKStringBuilder builder;
+  builder.PushNACK(5);
+  builder.PushNACK(6);
+  builder.PushNACK(7);
+  builder.PushNACK(9);
+  builder.PushNACK(10);
+  builder.PushNACK(11);
+  builder.PushNACK(12);
+  builder.PushNACK(15);
+  builder.PushNACK(18);
+  builder.PushNACK(19);
+  EXPECT_EQ(std::string("5-7,9-12,15,18-19"), builder.GetResult());
+}
+
+TEST(NACKStringBuilderTest, TestCase3) {
+  NACKStringBuilder builder;
+  builder.PushNACK(5);
+  builder.PushNACK(7);
+  builder.PushNACK(9);
+  builder.PushNACK(10);
+  builder.PushNACK(11);
+  builder.PushNACK(12);
+  builder.PushNACK(15);
+  builder.PushNACK(18);
+  builder.PushNACK(19);
+  builder.PushNACK(21);
+  EXPECT_EQ(std::string("5,7,9-12,15,18-19,21"), builder.GetResult());
+}
+
+TEST(NACKStringBuilderTest, TestCase4) {
+  NACKStringBuilder builder;
+  builder.PushNACK(5);
+  builder.PushNACK(7);
+  builder.PushNACK(8);
+  builder.PushNACK(9);
+  builder.PushNACK(10);
+  builder.PushNACK(11);
+  builder.PushNACK(12);
+  builder.PushNACK(15);
+  builder.PushNACK(18);
+  builder.PushNACK(19);
+  EXPECT_EQ(std::string("5,7-12,15,18-19"), builder.GetResult());
+}
+
+TEST(NACKStringBuilderTest, TestCase5) {
+  NACKStringBuilder builder;
+  builder.PushNACK(5);
+  builder.PushNACK(7);
+  builder.PushNACK(9);
+  builder.PushNACK(10);
+  builder.PushNACK(11);
+  builder.PushNACK(12);
+  builder.PushNACK(15);
+  builder.PushNACK(16);
+  builder.PushNACK(18);
+  builder.PushNACK(19);
+  EXPECT_EQ(std::string("5,7,9-12,15-16,18-19"), builder.GetResult());
+}
+
+TEST(NACKStringBuilderTest, TestCase6) {
+  NACKStringBuilder builder;
+  builder.PushNACK(5);
+  builder.PushNACK(7);
+  builder.PushNACK(9);
+  builder.PushNACK(10);
+  builder.PushNACK(11);
+  builder.PushNACK(12);
+  builder.PushNACK(15);
+  builder.PushNACK(16);
+  builder.PushNACK(17);
+  builder.PushNACK(18);
+  builder.PushNACK(19);
+  EXPECT_EQ(std::string("5,7,9-12,15-19"), builder.GetResult());
+}
+
+TEST(NACKStringBuilderTest, TestCase7) {
+  NACKStringBuilder builder;
+  builder.PushNACK(5);
+  builder.PushNACK(6);
+  builder.PushNACK(7);
+  builder.PushNACK(8);
+  builder.PushNACK(11);
+  builder.PushNACK(12);
+  builder.PushNACK(13);
+  builder.PushNACK(14);
+  builder.PushNACK(15);
+  EXPECT_EQ(std::string("5-8,11-15"), builder.GetResult());
+}
+
+TEST(NACKStringBuilderTest, TestCase8) {
+  NACKStringBuilder builder;
+  builder.PushNACK(5);
+  builder.PushNACK(7);
+  builder.PushNACK(9);
+  builder.PushNACK(11);
+  builder.PushNACK(15);
+  builder.PushNACK(17);
+  builder.PushNACK(19);
+  EXPECT_EQ(std::string("5,7,9,11,15,17,19"), builder.GetResult());
+}
+
+TEST(NACKStringBuilderTest, TestCase9) {
+  NACKStringBuilder builder;
+  builder.PushNACK(5);
+  builder.PushNACK(6);
+  builder.PushNACK(7);
+  builder.PushNACK(8);
+  builder.PushNACK(9);
+  builder.PushNACK(10);
+  builder.PushNACK(11);
+  builder.PushNACK(12);
+  EXPECT_EQ(std::string("5-12"), builder.GetResult());
+}
+
+TEST(NACKStringBuilderTest, TestCase10) {
+  NACKStringBuilder builder;
+  builder.PushNACK(5);
+  EXPECT_EQ(std::string("5"), builder.GetResult());
+}
+
+TEST(NACKStringBuilderTest, TestCase11) {
+  NACKStringBuilder builder;
+  EXPECT_EQ(std::string(""), builder.GetResult());
+}
+
+TEST(NACKStringBuilderTest, TestCase12) {
+  NACKStringBuilder builder;
+  builder.PushNACK(5);
+  builder.PushNACK(6);
+  EXPECT_EQ(std::string("5-6"), builder.GetResult());
+}
+
+TEST(NACKStringBuilderTest, TestCase13) {
+  NACKStringBuilder builder;
+  builder.PushNACK(5);
+  builder.PushNACK(6);
+  builder.PushNACK(9);
+  EXPECT_EQ(std::string("5-6,9"), builder.GetResult());
+}
+
+void CreateRtpPacket(const bool marker_bit, const uint8_t payload,
+    const uint16_t seq_num, const uint32_t timestamp,
+    const uint32_t ssrc, uint8_t* array,
+    uint16_t* cur_pos) {
   ASSERT_TRUE(payload <= 127);
   array[(*cur_pos)++] = 0x80;
   array[(*cur_pos)++] = payload | (marker_bit ? 0x80 : 0);
@@ -73,8 +229,8 @@ class TestTransport : public Transport,
   }
 
   virtual int SendRTCPPacket(int /*ch*/, const void *packet, int packet_len) {
-    RTCPUtility::RTCPParserV2 rtcpParser((WebRtc_UWord8*)packet,
-                                         (WebRtc_Word32)packet_len,
+    RTCPUtility::RTCPParserV2 rtcpParser((uint8_t*)packet,
+                                         (int32_t)packet_len,
                                          true); // Allow non-compound RTCP
 
     EXPECT_TRUE(rtcpParser.IsValid());
@@ -106,8 +262,8 @@ class TestTransport : public Transport,
     return packet_len;
   }
 
-  virtual int OnReceivedPayloadData(const WebRtc_UWord8* payloadData,
-                                    const WebRtc_UWord16 payloadSize,
+  virtual int OnReceivedPayloadData(const uint8_t* payloadData,
+                                    const uint16_t payloadSize,
                                     const WebRtcRTPHeader* rtpHeader) {
     return 0;
   }
@@ -122,9 +278,7 @@ class RtcpSenderTest : public ::testing::Test {
         system_clock_(Clock::GetRealTimeClock()),
         remote_bitrate_observer_(),
         remote_bitrate_estimator_(
-            RemoteBitrateEstimator::Create(
-                over_use_detector_options_,
-                RemoteBitrateEstimator::kSingleStreamEstimation,
+            RemoteBitrateEstimatorFactory().Create(
                 &remote_bitrate_observer_,
                 system_clock_)) {
     test_transport_ = new TestTransport();
@@ -184,11 +338,11 @@ TEST_F(RtcpSenderTest, IJStatus) {
 
 TEST_F(RtcpSenderTest, TestCompound) {
   const bool marker_bit = false;
-  const WebRtc_UWord8 payload = 100;
-  const WebRtc_UWord16 seq_num = 11111;
-  const WebRtc_UWord32 timestamp = 1234567;
-  const WebRtc_UWord32 ssrc = 0x11111111;
-  WebRtc_UWord16 packet_length = 0;
+  const uint8_t payload = 100;
+  const uint16_t seq_num = 11111;
+  const uint32_t timestamp = 1234567;
+  const uint32_t ssrc = 0x11111111;
+  uint16_t packet_length = 0;
   CreateRtpPacket(marker_bit, payload, seq_num, timestamp, ssrc, packet_,
       &packet_length);
   EXPECT_EQ(25, packet_length);
@@ -200,7 +354,11 @@ TEST_F(RtcpSenderTest, TestCompound) {
   EXPECT_EQ(0, rtp_rtcp_impl_->RegisterReceivePayload(codec_inst));
 
   // Make sure RTP packet has been received.
-  EXPECT_EQ(0, rtp_rtcp_impl_->IncomingPacket(packet_, packet_length));
+  scoped_ptr<RtpHeaderParser> parser(RtpHeaderParser::Create());
+  RTPHeader header;
+  EXPECT_TRUE(parser->Parse(packet_, packet_length, &header));
+  EXPECT_EQ(0, rtp_rtcp_impl_->IncomingRtpPacket(packet_, packet_length,
+                                                 header));
 
   EXPECT_EQ(0, rtcp_sender_->SetIJStatus(true));
   EXPECT_EQ(0, rtcp_sender_->SetRTCPStatus(kRtcpCompound));
@@ -249,7 +407,7 @@ TEST_F(RtcpSenderTest, SendsTmmbnIfSetAndValid) {
   EXPECT_EQ(0, rtcp_sender_->SetRTCPStatus(kRtcpCompound));
   TMMBRSet bounding_set;
   bounding_set.VerifyAndAllocateSet(1);
-  const WebRtc_UWord32 kSourceSsrc = 12345;
+  const uint32_t kSourceSsrc = 12345;
   bounding_set.AddEntry(32768, 0, kSourceSsrc);
 
   EXPECT_EQ(0, rtcp_sender_->SetTMMBN(&bounding_set, 3));

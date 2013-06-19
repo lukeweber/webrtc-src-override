@@ -36,7 +36,7 @@
         'iLBC',
         'iSAC',
         'CNG',
-        '<(webrtc_root)/common_audio/common_audio.gyp:vad',
+        '<(webrtc_root)/common_audio/common_audio.gyp:common_audio',
       ],
       'defines': [
         'CODEC_ILBC',
@@ -179,9 +179,3 @@
     },
   ], # targets
 }
-
-# Local Variables:
-# tab-width:2
-# indent-tabs-mode:nil
-# End:
-# vim: set expandtab tabstop=2 shiftwidth=2:

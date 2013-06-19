@@ -8,15 +8,15 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "video_engine/vie_frame_provider_base.h"
+#include "webrtc/video_engine/vie_frame_provider_base.h"
 
 #include <algorithm>
 
-#include "common_video/interface/i420_video_frame.h"
-#include "system_wrappers/interface/critical_section_wrapper.h"
-#include "system_wrappers/interface/tick_util.h"
-#include "system_wrappers/interface/trace.h"
-#include "video_engine/vie_defines.h"
+#include "webrtc/common_video/interface/i420_video_frame.h"
+#include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
+#include "webrtc/system_wrappers/interface/tick_util.h"
+#include "webrtc/system_wrappers/interface/trace.h"
+#include "webrtc/video_engine/vie_defines.h"
 
 namespace webrtc {
 
@@ -48,7 +48,7 @@ int ViEFrameProviderBase::Id() {
 void ViEFrameProviderBase::DeliverFrame(
     I420VideoFrame* video_frame,
     int num_csrcs,
-    const WebRtc_UWord32 CSRC[kRtpCsrcSize]) {
+    const uint32_t CSRC[kRtpCsrcSize]) {
 #ifdef DEBUG_
   const TickTime start_process_time = TickTime::Now();
 #endif

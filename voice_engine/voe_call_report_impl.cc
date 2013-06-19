@@ -8,15 +8,15 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "voe_call_report_impl.h"
+#include "webrtc/voice_engine/voe_call_report_impl.h"
 
-#include "audio_processing.h"
-#include "channel.h"
-#include "critical_section_wrapper.h"
-#include "file_wrapper.h"
-#include "trace.h"
-#include "voe_errors.h"
-#include "voice_engine_impl.h"
+#include "webrtc/modules/audio_processing/include/audio_processing.h"
+#include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
+#include "webrtc/system_wrappers/interface/file_wrapper.h"
+#include "webrtc/system_wrappers/interface/trace.h"
+#include "webrtc/voice_engine/channel.h"
+#include "webrtc/voice_engine/include/voe_errors.h"
+#include "webrtc/voice_engine/voice_engine_impl.h"
 
 namespace webrtc
 {
@@ -100,13 +100,13 @@ int VoECallReportImpl::ResetCallReportStatistics(int channel)
     }
     else
     {
-        WebRtc_Word32 numOfChannels =
+        int32_t numOfChannels =
             _shared->channel_manager().NumOfChannels();
         if (numOfChannels <= 0)
         {
             return 0;
         }
-        WebRtc_Word32* channelsArray = new WebRtc_Word32[numOfChannels];
+        int32_t* channelsArray = new int32_t[numOfChannels];
         _shared->channel_manager().GetChannelIds(channelsArray, numOfChannels);
         for (int i = 0; i < numOfChannels; i++)
         {
@@ -333,12 +333,12 @@ int VoECallReportImpl::WriteReportToFile(const char* fileNameUTF8)
     _file.WriteText("\nNetwork Packet Round Trip Time (RTT)\n");
     _file.WriteText("------------------------------------\n\n");
 
-    WebRtc_Word32 numOfChannels = _shared->channel_manager().NumOfChannels();
+    int32_t numOfChannels = _shared->channel_manager().NumOfChannels();
     if (numOfChannels <= 0)
     {
         return 0;
     }
-    WebRtc_Word32* channelsArray = new WebRtc_Word32[numOfChannels];
+    int32_t* channelsArray = new int32_t[numOfChannels];
     _shared->channel_manager().GetChannelIds(channelsArray, numOfChannels);
     for (int ch = 0; ch < numOfChannels; ch++)
     {

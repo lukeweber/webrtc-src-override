@@ -18,11 +18,10 @@
         '<(webrtc_root)/test/test.gyp:test_support_main',
       ],
       'sources': [
+        '../../common_unittest.cc',
         'aligned_malloc_unittest.cc',
+        'clock_unittest.cc',
         'condition_variable_unittest.cc',
-        'cpu_wrapper_unittest.cc',
-        'cpu_measurement_harness.h',
-        'cpu_measurement_harness.cc',
         'critical_section_unittest.cc',
         'event_tracer_unittest.cc',
         'list_unittest.cc',
@@ -36,7 +35,6 @@
         'stringize_macros_unittest.cc',
         'thread_unittest.cc',
         'thread_posix_unittest.cc',
-        'trace_unittest.cc',
         'unittest_utilities_unittest.cc',
       ],
       'conditions': [

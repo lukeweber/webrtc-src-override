@@ -19,6 +19,7 @@ LOCAL_CPP_EXTENSION := .cc
 LOCAL_GENERATED_SOURCES :=
 LOCAL_SRC_FILES := \
     bitrate.cc \
+	rtp_header_parser.cc \
     rtp_rtcp_impl.cc \
     rtcp_receiver.cc \
     rtcp_receiver_help.cc \

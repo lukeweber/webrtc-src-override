@@ -10,8 +10,8 @@
 
 #include "webrtc/modules/rtp_rtcp/source/rtp_payload_registry.h"
 
-#include "gtest/gtest.h"
-#include "gmock/gmock.h"
+#include "testing/gmock/include/gmock/gmock.h"
+#include "testing/gtest/include/gtest/gtest.h"
 #include "webrtc/modules/rtp_rtcp/source/mock/mock_rtp_payload_strategy.h"
 #include "webrtc/modules/rtp_rtcp/source/rtp_utility.h"
 #include "webrtc/system_wrappers/interface/scoped_ptr.h"
@@ -232,5 +232,23 @@ TEST_P(ParameterizedRtpPayloadRegistryTest,
 INSTANTIATE_TEST_CASE_P(TestKnownBadPayloadTypes,
                         ParameterizedRtpPayloadRegistryTest,
                         testing::Values(64, 72, 73, 74, 75, 76, 77, 78, 79));
+
+class RtpPayloadRegistryGenericTest :
+    public RtpPayloadRegistryTest,
+    public ::testing::WithParamInterface<int> {
+};
+
+TEST_P(RtpPayloadRegistryGenericTest, RegisterGenericReceivePayloadType) {
+  int payload_type = GetParam();
+
+  bool ignored;
+
+  EXPECT_EQ(0, rtp_payload_registry_->RegisterReceivePayload("generic-codec",
+    static_cast<int8_t>(payload_type),
+    19, 1, 17, &ignored)); // dummy values, except for payload_type
+}
+
+INSTANTIATE_TEST_CASE_P(TestDynamicRange, RtpPayloadRegistryGenericTest,
+                        testing::Range(96, 127+1));
 
 }  // namespace webrtc

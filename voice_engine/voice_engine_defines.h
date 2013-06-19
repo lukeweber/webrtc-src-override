@@ -60,23 +60,6 @@ enum { kVoiceEngineMaxModuleVersionSize = 960 };
 // Base
 enum { kVoiceEngineVersionMaxMessageSize = 1024 };
 
-// Encryption
-// SRTP uses 30 bytes key length
-enum { kVoiceEngineMaxSrtpKeyLength = 30 };
-// SRTP minimum key/tag length for encryption level
-enum { kVoiceEngineMinSrtpEncryptLength = 16 };
-// SRTP maximum key/tag length for encryption level
-enum { kVoiceEngineMaxSrtpEncryptLength = 256 };
-// SRTP maximum key/tag length for authentication level,
-// HMAC SHA1 authentication type
-enum { kVoiceEngineMaxSrtpAuthSha1Length = 20 };
-// SRTP maximum tag length for authentication level,
-// null authentication type
-enum { kVoiceEngineMaxSrtpTagAuthNullLength = 12 };
-// SRTP maximum key length for authentication level,
-// null authentication type
-enum { kVoiceEngineMaxSrtpKeyAuthNullLength = 256 };
-
 // Audio processing
 const NoiseSuppression::Level kDefaultNsMode = NoiseSuppression::kModerate;
 const GainControl::Mode kDefaultAgcMode =
@@ -215,7 +198,7 @@ enum { kVoiceEngineMaxRtpExtensionId = 14 };
 namespace webrtc
 {
 
-inline int VoEId(const int veId, const int chId)
+inline int VoEId(int veId, int chId)
 {
     if (chId == -1)
     {
@@ -225,13 +208,13 @@ inline int VoEId(const int veId, const int chId)
     return (int) ((veId << 16) + chId);
 }
 
-inline int VoEModuleId(const int veId, const int chId)
+inline int VoEModuleId(int veId, int chId)
 {
     return (int) ((veId << 16) + chId);
 }
 
 // Convert module ID to internal VoE channel ID
-inline int VoEChannelId(const int moduleId)
+inline int VoEChannelId(int moduleId)
 {
     return (int) (moduleId & 0xffff);
 }
@@ -273,28 +256,28 @@ inline int VoEChannelId(const int moduleId)
 
 #ifdef WEBRTC_LINUX
 
-#include <pthread.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <pthread.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #ifndef QNX
   #include <linux/net.h>
 #ifndef ANDROID
   #include <sys/soundcard.h>
 #endif // ANDROID
 #endif // QNX
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 #include <errno.h>
-#include <sys/stat.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <sched.h>
-#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <sys/time.h>
+#include <time.h>
+#include <unistd.h>
 
 #define DWORD unsigned long int
 #define WINAPI
@@ -357,22 +340,22 @@ inline int VoEChannelId(const int moduleId)
 
 #ifdef WEBRTC_MAC
 
-#include <pthread.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sched.h>
-#include <sys/time.h>
-#include <time.h>
 #include <AudioUnit/AudioUnit.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <pthread.h>
+#include <sched.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
 #if !defined(WEBRTC_IOS)
   #include <CoreServices/CoreServices.h>
   #include <CoreAudio/CoreAudio.h>

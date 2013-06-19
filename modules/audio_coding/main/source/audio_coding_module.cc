@@ -14,13 +14,21 @@
 #include "webrtc/modules/audio_coding/main/source/acm_codec_database.h"
 #include "webrtc/modules/audio_coding/main/source/acm_dtmf_detection.h"
 #include "webrtc/modules/audio_coding/main/source/audio_coding_module_impl.h"
+#include "webrtc/system_wrappers/interface/clock.h"
 #include "webrtc/system_wrappers/interface/trace.h"
 
 namespace webrtc {
 
 // Create module
-AudioCodingModule* AudioCodingModule::Create(const WebRtc_Word32 id) {
-  return new AudioCodingModuleImpl(id);
+AudioCodingModule* AudioCodingModule::Create(const int32_t id) {
+  return new AudioCodingModuleImpl(id, Clock::GetRealTimeClock());
+}
+
+// Used for testing by inserting a simulated clock. ACM will not destroy the
+// injected |clock| the client has to take care of that.
+AudioCodingModule* AudioCodingModule::Create(const int32_t id,
+                                             Clock* clock) {
+  return new AudioCodingModuleImpl(id, clock);
 }
 
 // Destroy module
@@ -29,27 +37,27 @@ void AudioCodingModule::Destroy(AudioCodingModule* module) {
 }
 
 // Get number of supported codecs
-WebRtc_UWord8 AudioCodingModule::NumberOfCodecs() {
-  return static_cast<WebRtc_UWord8>(ACMCodecDB::kNumCodecs);
+uint8_t AudioCodingModule::NumberOfCodecs() {
+  return static_cast<uint8_t>(ACMCodecDB::kNumCodecs);
 }
 
 // Get supported codec param with id
-WebRtc_Word32 AudioCodingModule::Codec(WebRtc_UWord8 list_id,
-                                       CodecInst* codec) {
+int32_t AudioCodingModule::Codec(uint8_t list_id,
+                                 CodecInst* codec) {
   // Get the codec settings for the codec with the given list ID
   return ACMCodecDB::Codec(list_id, codec);
 }
 
 // Get supported codec Param with name, frequency and number of channels.
-WebRtc_Word32 AudioCodingModule::Codec(const char* payload_name,
-                                       CodecInst* codec, int sampling_freq_hz,
-                                       int channels) {
+int32_t AudioCodingModule::Codec(const char* payload_name,
+                                 CodecInst* codec, int sampling_freq_hz,
+                                 int channels) {
   int codec_id;
 
   // Get the id of the codec from the database.
   codec_id = ACMCodecDB::CodecId(payload_name, sampling_freq_hz, channels);
   if (codec_id < 0) {
-    // We couldn't find a matching codec, set the parameterss to unacceptable
+    // We couldn't find a matching codec, set the parameters to unacceptable
     // values and return.
     codec->plname[0] = '\0';
     codec->pltype = -1;
@@ -63,15 +71,15 @@ WebRtc_Word32 AudioCodingModule::Codec(const char* payload_name,
   ACMCodecDB::Codec(codec_id, codec);
 
   // Keep the number of channels from the function call. For most codecs it
-  // will be the same value as in defaul codec settings, but not for all.
+  // will be the same value as in default codec settings, but not for all.
   codec->channels = channels;
 
   return 0;
 }
 
 // Get supported codec Index with name, frequency and number of channels.
-WebRtc_Word32 AudioCodingModule::Codec(const char* payload_name,
-                                       int sampling_freq_hz, int channels) {
+int32_t AudioCodingModule::Codec(const char* payload_name,
+                                 int sampling_freq_hz, int channels) {
   return ACMCodecDB::CodecId(payload_name, sampling_freq_hz, channels);
 }
 

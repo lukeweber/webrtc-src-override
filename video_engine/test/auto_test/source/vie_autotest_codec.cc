@@ -10,14 +10,9 @@
 
 #include "webrtc/common_types.h"
 #include "webrtc/engine_configurations.h"
+#include "webrtc/modules/video_coding/codecs/i420/main/interface/i420.h"
 #include "webrtc/system_wrappers/interface/scoped_ptr.h"
 #include "webrtc/test/channel_transport/include/channel_transport.h"
-#include "webrtc/video_engine/test/auto_test/interface/vie_autotest_defines.h"
-#include "webrtc/video_engine/test/auto_test/interface/vie_autotest.h"
-#include "webrtc/video_engine/test/libvietest/include/tb_capture_device.h"
-#include "webrtc/video_engine/test/libvietest/include/tb_I420_codec.h"
-#include "webrtc/video_engine/test/libvietest/include/tb_interfaces.h"
-#include "webrtc/video_engine/test/libvietest/include/tb_video_channel.h"
 #include "webrtc/video_engine/include/vie_base.h"
 #include "webrtc/video_engine/include/vie_capture.h"
 #include "webrtc/video_engine/include/vie_codec.h"
@@ -25,6 +20,12 @@
 #include "webrtc/video_engine/include/vie_network.h"
 #include "webrtc/video_engine/include/vie_render.h"
 #include "webrtc/video_engine/include/vie_rtp_rtcp.h"
+#include "webrtc/video_engine/test/auto_test/interface/vie_autotest.h"
+#include "webrtc/video_engine/test/auto_test/interface/vie_autotest_defines.h"
+#include "webrtc/video_engine/test/libvietest/include/tb_I420_codec.h"
+#include "webrtc/video_engine/test/libvietest/include/tb_capture_device.h"
+#include "webrtc/video_engine/test/libvietest/include/tb_interfaces.h"
+#include "webrtc/video_engine/test/libvietest/include/tb_video_channel.h"
 #include "webrtc/voice_engine/include/voe_base.h"
 
 class TestCodecObserver
@@ -497,12 +498,43 @@ void ViEAutoTest::ViECodecAPITest() {
       break;
     }
   }
+
   memset(&video_codec, 0, sizeof(video_codec));
   EXPECT_EQ(0, codec->GetSendCodec(video_channel, video_codec));
   EXPECT_EQ(webrtc::kVideoCodecI420, video_codec.codecType);
 
+  // Register a generic codec
+  memset(&video_codec, 0, sizeof(video_codec));
+  video_codec.codecType = webrtc::kVideoCodecGeneric;
+  strcpy(video_codec.plName, "generic-codec");
+  uint8_t payload_type = 127;
+  video_codec.plType = payload_type;
+  video_codec.minBitrate = 100;
+  video_codec.startBitrate = 500;
+  video_codec.maxBitrate = 10000;
+  video_codec.width = 1920;
+  video_codec.height = 1080;
+  video_codec.maxFramerate = 30;
+  video_codec.qpMax = 50;
+
+  webrtc::ViEExternalCodec* external_codec =
+      webrtc::ViEExternalCodec::GetInterface(video_engine);
+  EXPECT_TRUE(external_codec != NULL);
+
+  // Any encoder will do.
+  webrtc::I420Encoder encoder;
+  EXPECT_EQ(0, external_codec->RegisterExternalSendCodec(video_channel,
+                                                         payload_type, &encoder,
+                                                         false));
+  EXPECT_EQ(0, codec->SetSendCodec(video_channel, video_codec));
+
+  memset(&video_codec, 0, sizeof(video_codec));
+  EXPECT_EQ(0, codec->GetSendCodec(video_channel, video_codec));
+  EXPECT_EQ(webrtc::kVideoCodecGeneric, video_codec.codecType);
+
   EXPECT_EQ(0, base->DeleteChannel(video_channel));
 
+  EXPECT_EQ(0, external_codec->Release());
   EXPECT_EQ(0, codec->Release());
   EXPECT_EQ(0, base->Release());
   EXPECT_TRUE(webrtc::VideoEngine::Delete(video_engine));

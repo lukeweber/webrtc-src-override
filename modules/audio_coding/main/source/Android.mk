@@ -33,7 +33,8 @@ LOCAL_SRC_FILES := \
     acm_red.cc \
     acm_resampler.cc \
     audio_coding_module.cc \
-    audio_coding_module_impl.cc
+    audio_coding_module_impl.cc \
+	nack.cc
 
 # Flags passed to both C and C++ files.
 LOCAL_CFLAGS := \

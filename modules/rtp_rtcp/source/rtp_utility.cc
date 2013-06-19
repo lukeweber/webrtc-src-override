@@ -8,15 +8,18 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "rtp_utility.h"
+#include "webrtc/modules/rtp_rtcp/source/rtp_utility.h"
 
 #include <cassert>
 #include <cmath>  // ceil
 #include <cstring>  // memcpy
 
 #if defined(_WIN32)
+// Order for these headers are important
 #include <Windows.h>  // FILETIME
+
 #include <WinSock.h>  // timeval
+
 #include <MMSystem.h>  // timeGetTime
 #elif ((defined WEBRTC_LINUX) || (defined WEBRTC_MAC))
 #include <sys/time.h>  // gettimeofday
@@ -26,8 +29,8 @@
 #include <stdio.h>
 #endif
 
-#include "system_wrappers/interface/tick_util.h"
-#include "system_wrappers/interface/trace.h"
+#include "webrtc/system_wrappers/interface/tick_util.h"
+#include "webrtc/system_wrappers/interface/trace.h"
 
 #if (defined(_DEBUG) && defined(_WIN32) && (_MSC_VER >= 1400))
 #define DEBUG_PRINT(...)           \
@@ -54,13 +57,13 @@ enum {
  * Time routines.
  */
 
-WebRtc_UWord32 GetCurrentRTP(Clock* clock, WebRtc_UWord32 freq) {
+uint32_t GetCurrentRTP(Clock* clock, uint32_t freq) {
   const bool use_global_clock = (clock == NULL);
   Clock* local_clock = clock;
   if (use_global_clock) {
     local_clock = Clock::GetRealTimeClock();
   }
-  WebRtc_UWord32 secs = 0, frac = 0;
+  uint32_t secs = 0, frac = 0;
   local_clock->CurrentNtp(secs, frac);
   if (use_global_clock) {
     delete local_clock;
@@ -68,65 +71,44 @@ WebRtc_UWord32 GetCurrentRTP(Clock* clock, WebRtc_UWord32 freq) {
   return ConvertNTPTimeToRTP(secs, frac, freq);
 }
 
-WebRtc_UWord32 ConvertNTPTimeToRTP(WebRtc_UWord32 NTPsec,
-                                   WebRtc_UWord32 NTPfrac,
-                                   WebRtc_UWord32 freq) {
+uint32_t ConvertNTPTimeToRTP(uint32_t NTPsec, uint32_t NTPfrac, uint32_t freq) {
   float ftemp = (float)NTPfrac / (float)NTP_FRAC;
-  WebRtc_UWord32 tmp = (WebRtc_UWord32)(ftemp * freq);
+  uint32_t tmp = (uint32_t)(ftemp * freq);
   return NTPsec * freq + tmp;
 }
 
-WebRtc_UWord32 ConvertNTPTimeToMS(WebRtc_UWord32 NTPsec,
-                                  WebRtc_UWord32 NTPfrac) {
+uint32_t ConvertNTPTimeToMS(uint32_t NTPsec, uint32_t NTPfrac) {
   int freq = 1000;
   float ftemp = (float)NTPfrac / (float)NTP_FRAC;
-  WebRtc_UWord32 tmp = (WebRtc_UWord32)(ftemp * freq);
-  WebRtc_UWord32 MStime = NTPsec * freq + tmp;
+  uint32_t tmp = (uint32_t)(ftemp * freq);
+  uint32_t MStime = NTPsec * freq + tmp;
   return MStime;
-}
-
-bool OldTimestamp(uint32_t newTimestamp,
-                  uint32_t existingTimestamp,
-                  bool* wrapped) {
-  bool tmpWrapped =
-    (newTimestamp < 0x0000ffff && existingTimestamp > 0xffff0000) ||
-    (newTimestamp > 0xffff0000 && existingTimestamp < 0x0000ffff);
-  *wrapped = tmpWrapped;
-  if (existingTimestamp > newTimestamp && !tmpWrapped) {
-    return true;
-  } else if (existingTimestamp <= newTimestamp && !tmpWrapped) {
-    return false;
-  } else if (existingTimestamp < newTimestamp && tmpWrapped) {
-    return true;
-  } else {
-    return false;
-  }
 }
 
 /*
  * Misc utility routines
  */
 
-const WebRtc_UWord8* GetPayloadData(const WebRtcRTPHeader* rtp_header,
-                                    const WebRtc_UWord8* packet) {
-  return packet + rtp_header->header.headerLength;
+const uint8_t* GetPayloadData(const RTPHeader& rtp_header,
+                              const uint8_t* packet) {
+  return packet + rtp_header.headerLength;
 }
 
-WebRtc_UWord16 GetPayloadDataLength(const WebRtcRTPHeader* rtp_header,
-                                    const WebRtc_UWord16 packet_length) {
-  WebRtc_UWord16 length = packet_length - rtp_header->header.paddingLength -
-      rtp_header->header.headerLength;
-  return static_cast<WebRtc_UWord16>(length);
+uint16_t GetPayloadDataLength(const RTPHeader& rtp_header,
+                              const uint16_t packet_length) {
+  uint16_t length = packet_length - rtp_header.paddingLength -
+      rtp_header.headerLength;
+  return static_cast<uint16_t>(length);
 }
 
 #if defined(_WIN32)
 bool StringCompare(const char* str1, const char* str2,
-                   const WebRtc_UWord32 length) {
+                   const uint32_t length) {
   return (_strnicmp(str1, str2, length) == 0) ? true : false;
 }
 #elif defined(WEBRTC_LINUX) || defined(WEBRTC_MAC)
 bool StringCompare(const char* str1, const char* str2,
-                   const WebRtc_UWord32 length) {
+                   const uint32_t length) {
   return (strncasecmp(str1, str2, length) == 0) ? true : false;
 }
 #endif
@@ -139,62 +121,62 @@ bool StringCompare(const char* str1, const char* str2,
     All integer fields are carried in network byte order, that is, most
     significant byte (octet) first.  AKA big-endian.
 */
-void AssignUWord32ToBuffer(WebRtc_UWord8* dataBuffer, WebRtc_UWord32 value) {
+void AssignUWord32ToBuffer(uint8_t* dataBuffer, uint32_t value) {
 #if defined(WEBRTC_LITTLE_ENDIAN)
-  dataBuffer[0] = static_cast<WebRtc_UWord8>(value >> 24);
-  dataBuffer[1] = static_cast<WebRtc_UWord8>(value >> 16);
-  dataBuffer[2] = static_cast<WebRtc_UWord8>(value >> 8);
-  dataBuffer[3] = static_cast<WebRtc_UWord8>(value);
+  dataBuffer[0] = static_cast<uint8_t>(value >> 24);
+  dataBuffer[1] = static_cast<uint8_t>(value >> 16);
+  dataBuffer[2] = static_cast<uint8_t>(value >> 8);
+  dataBuffer[3] = static_cast<uint8_t>(value);
 #else
-  WebRtc_UWord32* ptr = reinterpret_cast<WebRtc_UWord32*>(dataBuffer);
+  uint32_t* ptr = reinterpret_cast<uint32_t*>(dataBuffer);
   ptr[0] = value;
 #endif
 }
 
-void AssignUWord24ToBuffer(WebRtc_UWord8* dataBuffer, WebRtc_UWord32 value) {
+void AssignUWord24ToBuffer(uint8_t* dataBuffer, uint32_t value) {
 #if defined(WEBRTC_LITTLE_ENDIAN)
-  dataBuffer[0] = static_cast<WebRtc_UWord8>(value >> 16);
-  dataBuffer[1] = static_cast<WebRtc_UWord8>(value >> 8);
-  dataBuffer[2] = static_cast<WebRtc_UWord8>(value);
+  dataBuffer[0] = static_cast<uint8_t>(value >> 16);
+  dataBuffer[1] = static_cast<uint8_t>(value >> 8);
+  dataBuffer[2] = static_cast<uint8_t>(value);
 #else
-  dataBuffer[0] = static_cast<WebRtc_UWord8>(value);
-  dataBuffer[1] = static_cast<WebRtc_UWord8>(value >> 8);
-  dataBuffer[2] = static_cast<WebRtc_UWord8>(value >> 16);
+  dataBuffer[0] = static_cast<uint8_t>(value);
+  dataBuffer[1] = static_cast<uint8_t>(value >> 8);
+  dataBuffer[2] = static_cast<uint8_t>(value >> 16);
 #endif
 }
 
-void AssignUWord16ToBuffer(WebRtc_UWord8* dataBuffer, WebRtc_UWord16 value) {
+void AssignUWord16ToBuffer(uint8_t* dataBuffer, uint16_t value) {
 #if defined(WEBRTC_LITTLE_ENDIAN)
-  dataBuffer[0] = static_cast<WebRtc_UWord8>(value >> 8);
-  dataBuffer[1] = static_cast<WebRtc_UWord8>(value);
+  dataBuffer[0] = static_cast<uint8_t>(value >> 8);
+  dataBuffer[1] = static_cast<uint8_t>(value);
 #else
-  WebRtc_UWord16* ptr = reinterpret_cast<WebRtc_UWord16*>(dataBuffer);
+  uint16_t* ptr = reinterpret_cast<uint16_t*>(dataBuffer);
   ptr[0] = value;
 #endif
 }
 
-WebRtc_UWord16 BufferToUWord16(const WebRtc_UWord8* dataBuffer) {
+uint16_t BufferToUWord16(const uint8_t* dataBuffer) {
 #if defined(WEBRTC_LITTLE_ENDIAN)
   return (dataBuffer[0] << 8) + dataBuffer[1];
 #else
-  return *reinterpret_cast<const WebRtc_UWord16*>(dataBuffer);
+  return *reinterpret_cast<const uint16_t*>(dataBuffer);
 #endif
 }
 
-WebRtc_UWord32 BufferToUWord24(const WebRtc_UWord8* dataBuffer) {
+uint32_t BufferToUWord24(const uint8_t* dataBuffer) {
   return (dataBuffer[0] << 16) + (dataBuffer[1] << 8) + dataBuffer[2];
 }
 
-WebRtc_UWord32 BufferToUWord32(const WebRtc_UWord8* dataBuffer) {
+uint32_t BufferToUWord32(const uint8_t* dataBuffer) {
 #if defined(WEBRTC_LITTLE_ENDIAN)
   return (dataBuffer[0] << 24) + (dataBuffer[1] << 16) + (dataBuffer[2] << 8) +
       dataBuffer[3];
 #else
-  return *reinterpret_cast<const WebRtc_UWord32*>(dataBuffer);
+  return *reinterpret_cast<const uint32_t*>(dataBuffer);
 #endif
 }
 
-WebRtc_UWord32 pow2(WebRtc_UWord8 exp) {
+uint32_t pow2(uint8_t exp) {
   return 1 << exp;
 }
 
@@ -225,8 +207,8 @@ void RTPPayload::SetType(RtpVideoCodecTypes videoType) {
   }
 }
 
-RTPHeaderParser::RTPHeaderParser(const WebRtc_UWord8* rtpData,
-                                 const WebRtc_UWord32 rtpDataLength)
+RTPHeaderParser::RTPHeaderParser(const uint8_t* rtpData,
+                                 const uint32_t rtpDataLength)
   : _ptrRTPDataBegin(rtpData),
     _ptrRTPDataEnd(rtpData ? (rtpData + rtpDataLength) : NULL) {
 }
@@ -279,12 +261,12 @@ bool RTPHeaderParser::RTCP() const {
     return false;
   }
 
-  const WebRtc_UWord8 V  = _ptrRTPDataBegin[0] >> 6;
+  const uint8_t V  = _ptrRTPDataBegin[0] >> 6;
   if (V != kRtcpExpectedVersion) {
     return false;
   }
 
-  const WebRtc_UWord8  payloadType = _ptrRTPDataBegin[1];
+  const uint8_t  payloadType = _ptrRTPDataBegin[1];
   bool RTCP = false;
   switch (payloadType) {
     case 192:
@@ -309,7 +291,7 @@ bool RTPHeaderParser::RTCP() const {
   return RTCP;
 }
 
-bool RTPHeaderParser::Parse(WebRtcRTPHeader& parsedPacket,
+bool RTPHeaderParser::Parse(RTPHeader& header,
                             RtpHeaderExtensionMap* ptrExtensionMap) const {
   const ptrdiff_t length = _ptrRTPDataEnd - _ptrRTPDataBegin;
 
@@ -318,27 +300,27 @@ bool RTPHeaderParser::Parse(WebRtcRTPHeader& parsedPacket,
   }
 
   // Version
-  const WebRtc_UWord8 V  = _ptrRTPDataBegin[0] >> 6;
+  const uint8_t V  = _ptrRTPDataBegin[0] >> 6;
   // Padding
   const bool          P  = ((_ptrRTPDataBegin[0] & 0x20) == 0) ? false : true;
   // eXtension
   const bool          X  = ((_ptrRTPDataBegin[0] & 0x10) == 0) ? false : true;
-  const WebRtc_UWord8 CC = _ptrRTPDataBegin[0] & 0x0f;
+  const uint8_t CC = _ptrRTPDataBegin[0] & 0x0f;
   const bool          M  = ((_ptrRTPDataBegin[1] & 0x80) == 0) ? false : true;
 
-  const WebRtc_UWord8 PT = _ptrRTPDataBegin[1] & 0x7f;
+  const uint8_t PT = _ptrRTPDataBegin[1] & 0x7f;
 
-  const WebRtc_UWord16 sequenceNumber = (_ptrRTPDataBegin[2] << 8) +
+  const uint16_t sequenceNumber = (_ptrRTPDataBegin[2] << 8) +
       _ptrRTPDataBegin[3];
 
-  const WebRtc_UWord8* ptr = &_ptrRTPDataBegin[4];
+  const uint8_t* ptr = &_ptrRTPDataBegin[4];
 
-  WebRtc_UWord32 RTPTimestamp = *ptr++ << 24;
+  uint32_t RTPTimestamp = *ptr++ << 24;
   RTPTimestamp += *ptr++ << 16;
   RTPTimestamp += *ptr++ << 8;
   RTPTimestamp += *ptr++;
 
-  WebRtc_UWord32 SSRC = *ptr++ << 24;
+  uint32_t SSRC = *ptr++ << 24;
   SSRC += *ptr++ << 16;
   SSRC += *ptr++ << 8;
   SSRC += *ptr++;
@@ -347,34 +329,36 @@ bool RTPHeaderParser::Parse(WebRtcRTPHeader& parsedPacket,
     return false;
   }
 
-  const WebRtc_UWord8 CSRCocts = CC * 4;
+  const uint8_t CSRCocts = CC * 4;
 
   if ((ptr + CSRCocts) > _ptrRTPDataEnd) {
     return false;
   }
 
-  parsedPacket.header.markerBit      = M;
-  parsedPacket.header.payloadType    = PT;
-  parsedPacket.header.sequenceNumber = sequenceNumber;
-  parsedPacket.header.timestamp      = RTPTimestamp;
-  parsedPacket.header.ssrc           = SSRC;
-  parsedPacket.header.numCSRCs       = CC;
-  parsedPacket.header.paddingLength  = P ? *(_ptrRTPDataEnd - 1) : 0;
+  header.markerBit      = M;
+  header.payloadType    = PT;
+  header.sequenceNumber = sequenceNumber;
+  header.timestamp      = RTPTimestamp;
+  header.ssrc           = SSRC;
+  header.numCSRCs       = CC;
+  header.paddingLength  = P ? *(_ptrRTPDataEnd - 1) : 0;
 
   for (unsigned int i = 0; i < CC; ++i) {
-    WebRtc_UWord32 CSRC = *ptr++ << 24;
+    uint32_t CSRC = *ptr++ << 24;
     CSRC += *ptr++ << 16;
     CSRC += *ptr++ << 8;
     CSRC += *ptr++;
-    parsedPacket.header.arrOfCSRCs[i] = CSRC;
+    header.arrOfCSRCs[i] = CSRC;
   }
-  parsedPacket.type.Audio.numEnergy = parsedPacket.header.numCSRCs;
 
-  parsedPacket.header.headerLength   = 12 + CSRCocts;
+  header.headerLength   = 12 + CSRCocts;
 
   // If in effect, MAY be omitted for those packets for which the offset
   // is zero.
-  parsedPacket.extension.transmissionTimeOffset = 0;
+  header.extension.transmissionTimeOffset = 0;
+
+  // May not be present in packet.
+  header.extension.absoluteSendTime = 0;
 
   if (X) {
     /* RTP header extension, RFC 3550.
@@ -391,35 +375,35 @@ bool RTPHeaderParser::Parse(WebRtcRTPHeader& parsedPacket,
       return false;
     }
 
-    parsedPacket.header.headerLength += 4;
+    header.headerLength += 4;
 
-    WebRtc_UWord16 definedByProfile = *ptr++ << 8;
+    uint16_t definedByProfile = *ptr++ << 8;
     definedByProfile += *ptr++;
 
-    WebRtc_UWord16 XLen = *ptr++ << 8;
+    uint16_t XLen = *ptr++ << 8;
     XLen += *ptr++; // in 32 bit words
     XLen *= 4; // in octs
 
     if (remain < (4 + XLen)) {
       return false;
     }
-    if (definedByProfile == RTP_ONE_BYTE_HEADER_EXTENSION) {
-      const WebRtc_UWord8* ptrRTPDataExtensionEnd = ptr + XLen;
-      ParseOneByteExtensionHeader(parsedPacket,
+    if (definedByProfile == kRtpOneByteHeaderExtensionId) {
+      const uint8_t* ptrRTPDataExtensionEnd = ptr + XLen;
+      ParseOneByteExtensionHeader(header,
                                   ptrExtensionMap,
                                   ptrRTPDataExtensionEnd,
                                   ptr);
     }
-    parsedPacket.header.headerLength += XLen;
+    header.headerLength += XLen;
   }
   return true;
 }
 
 void RTPHeaderParser::ParseOneByteExtensionHeader(
-    WebRtcRTPHeader& parsedPacket,
+    RTPHeader& header,
     const RtpHeaderExtensionMap* ptrExtensionMap,
-    const WebRtc_UWord8* ptrRTPDataExtensionEnd,
-    const WebRtc_UWord8* ptr) const {
+    const uint8_t* ptrRTPDataExtensionEnd,
+    const uint8_t* ptr) const {
   if (!ptrExtensionMap) {
     return;
   }
@@ -431,8 +415,8 @@ void RTPHeaderParser::ParseOneByteExtensionHeader(
     // |  ID   |  len  |
     // +-+-+-+-+-+-+-+-+
 
-    const WebRtc_UWord8 id = (*ptr & 0xf0) >> 4;
-    const WebRtc_UWord8 len = (*ptr & 0x0f);
+    const uint8_t id = (*ptr & 0xf0) >> 4;
+    const uint8_t len = (*ptr & 0x0f);
     ptr++;
 
     if (id == 15) {
@@ -461,13 +445,14 @@ void RTPHeaderParser::ParseOneByteExtensionHeader(
         // |  ID   | len=2 |              transmission offset              |
         // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
-        WebRtc_Word32 transmissionTimeOffset = *ptr++ << 16;
+        int32_t transmissionTimeOffset = *ptr++ << 16;
         transmissionTimeOffset += *ptr++ << 8;
         transmissionTimeOffset += *ptr++;
-        parsedPacket.extension.transmissionTimeOffset = transmissionTimeOffset;
+        header.extension.transmissionTimeOffset =
+            transmissionTimeOffset;
         if (transmissionTimeOffset & 0x800000) {
           // Negative offset, correct sign for Word24 to Word32.
-          parsedPacket.extension.transmissionTimeOffset |= 0xFF000000;
+          header.extension.transmissionTimeOffset |= 0xFF000000;
         }
         break;
       }
@@ -481,10 +466,28 @@ void RTPHeaderParser::ParseOneByteExtensionHeader(
         //
 
         // Parse out the fields but only use it for debugging for now.
-        // const WebRtc_UWord8 V = (*ptr & 0x80) >> 7;
-        // const WebRtc_UWord8 level = (*ptr & 0x7f);
+        // const uint8_t V = (*ptr & 0x80) >> 7;
+        // const uint8_t level = (*ptr & 0x7f);
         // DEBUG_PRINT("RTP_AUDIO_LEVEL_UNIQUE_ID: ID=%u, len=%u, V=%u,
         // level=%u", ID, len, V, level);
+        break;
+      }
+      case kRtpExtensionAbsoluteSendTime: {
+        if (len != 2) {
+          WEBRTC_TRACE(kTraceWarning, kTraceRtpRtcp, -1,
+                       "Incorrect absolute send time len: %d", len);
+          return;
+        }
+        //  0                   1                   2                   3
+        //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // |  ID   | len=2 |              absolute send time               |
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+        uint32_t absoluteSendTime = *ptr++ << 16;
+        absoluteSendTime += *ptr++ << 8;
+        absoluteSendTime += *ptr++;
+        header.extension.absoluteSendTime = absoluteSendTime;
         break;
       }
       default: {
@@ -493,16 +496,16 @@ void RTPHeaderParser::ParseOneByteExtensionHeader(
         return;
       }
     }
-    WebRtc_UWord8 num_bytes = ParsePaddingBytes(ptrRTPDataExtensionEnd, ptr);
+    uint8_t num_bytes = ParsePaddingBytes(ptrRTPDataExtensionEnd, ptr);
     ptr += num_bytes;
   }
 }
 
-WebRtc_UWord8 RTPHeaderParser::ParsePaddingBytes(
-  const WebRtc_UWord8* ptrRTPDataExtensionEnd,
-  const WebRtc_UWord8* ptr) const {
+uint8_t RTPHeaderParser::ParsePaddingBytes(
+  const uint8_t* ptrRTPDataExtensionEnd,
+  const uint8_t* ptr) const {
 
-  WebRtc_UWord8 num_zero_bytes = 0;
+  uint8_t num_zero_bytes = 0;
   while (ptrRTPDataExtensionEnd - ptr > 0) {
     if (*ptr != 0) {
       return num_zero_bytes;
@@ -515,9 +518,9 @@ WebRtc_UWord8 RTPHeaderParser::ParsePaddingBytes(
 
 // RTP payload parser
 RTPPayloadParser::RTPPayloadParser(const RtpVideoCodecTypes videoType,
-                                   const WebRtc_UWord8* payloadData,
-                                   WebRtc_UWord16 payloadDataLength,
-                                   WebRtc_Word32 id)
+                                   const uint8_t* payloadData,
+                                   uint16_t payloadDataLength,
+                                   int32_t id)
   :
   _id(id),
   _dataPtr(payloadData),
@@ -572,7 +575,7 @@ bool RTPPayloadParser::ParseGeneric(RTPPayload& /*parsedPacket*/) const {
 
 bool RTPPayloadParser::ParseVP8(RTPPayload& parsedPacket) const {
   RTPPayloadVP8* vp8 = &parsedPacket.info.VP8;
-  const WebRtc_UWord8* dataPtr = _dataPtr;
+  const uint8_t* dataPtr = _dataPtr;
   int dataLength = _dataLength;
 
   // Parse mandatory first byte of payload descriptor
@@ -618,7 +621,7 @@ bool RTPPayloadParser::ParseVP8(RTPPayload& parsedPacket) const {
 }
 
 int RTPPayloadParser::ParseVP8FrameSize(RTPPayload& parsedPacket,
-                                        const WebRtc_UWord8* dataPtr,
+                                        const uint8_t* dataPtr,
                                         int dataLength) const {
   if (parsedPacket.frameType != kIFrame) {
     // Included in payload header for I-frames.
@@ -636,7 +639,7 @@ int RTPPayloadParser::ParseVP8FrameSize(RTPPayload& parsedPacket,
 }
 
 int RTPPayloadParser::ParseVP8Extension(RTPPayloadVP8* vp8,
-                                        const WebRtc_UWord8* dataPtr,
+                                        const uint8_t* dataPtr,
                                         int dataLength) const {
   int parsedBytes = 0;
   if (dataLength <= 0) return -1;
@@ -672,7 +675,7 @@ int RTPPayloadParser::ParseVP8Extension(RTPPayloadVP8* vp8,
 }
 
 int RTPPayloadParser::ParseVP8PictureID(RTPPayloadVP8* vp8,
-                                        const WebRtc_UWord8** dataPtr,
+                                        const uint8_t** dataPtr,
                                         int* dataLength,
                                         int* parsedBytes) const {
   if (*dataLength <= 0) return -1;
@@ -691,7 +694,7 @@ int RTPPayloadParser::ParseVP8PictureID(RTPPayloadVP8* vp8,
 }
 
 int RTPPayloadParser::ParseVP8Tl0PicIdx(RTPPayloadVP8* vp8,
-                                        const WebRtc_UWord8** dataPtr,
+                                        const uint8_t** dataPtr,
                                         int* dataLength,
                                         int* parsedBytes) const {
   if (*dataLength <= 0) return -1;
@@ -703,7 +706,7 @@ int RTPPayloadParser::ParseVP8Tl0PicIdx(RTPPayloadVP8* vp8,
 }
 
 int RTPPayloadParser::ParseVP8TIDAndKeyIdx(RTPPayloadVP8* vp8,
-                                           const WebRtc_UWord8** dataPtr,
+                                           const uint8_t** dataPtr,
                                            int* dataLength,
                                            int* parsedBytes) const {
   if (*dataLength <= 0) return -1;

@@ -17,6 +17,7 @@ LOCAL_MODULE_CLASS := STATIC_LIBRARIES
 LOCAL_MODULE := libwebrtc_spl
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := \
+	../audio_util.cc \
     auto_corr_to_refl_coef.c \
     auto_correlation.c \
     complex_fft.c \

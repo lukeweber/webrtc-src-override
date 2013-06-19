@@ -11,12 +11,12 @@
 #include <cstdio>
 #include <string>
 
-#include "common_video/interface/video_image.h"
-#include "common_video/jpeg/include/jpeg.h"
-#include "common_video/libyuv/include/webrtc_libyuv.h"
-#include "gtest/gtest.h"
-#include "testsupport/fileutils.h"
-#include "modules/interface/module_common_types.h"
+#include "testing/gtest/include/gtest/gtest.h"
+#include "webrtc/common_video/interface/video_image.h"
+#include "webrtc/common_video/jpeg/include/jpeg.h"
+#include "webrtc/common_video/libyuv/include/webrtc_libyuv.h"
+#include "webrtc/modules/interface/module_common_types.h"
+#include "webrtc/test/testsupport/fileutils.h"
 
 namespace webrtc {
 
@@ -54,7 +54,7 @@ class JpegTest: public testing::Test {
     assert(open_file != NULL);
     size_t length = webrtc::test::GetFileSize(input_filename);
     EncodedImage* encoded_buffer = new EncodedImage();
-    encoded_buffer->_buffer = new WebRtc_UWord8[length];
+    encoded_buffer->_buffer = new uint8_t[length];
     encoded_buffer->_size = length;
     encoded_buffer->_length = length;
     if (fread(encoded_buffer->_buffer, 1, length, open_file) != length) {

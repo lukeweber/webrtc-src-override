@@ -12,16 +12,17 @@
 #define WEBRTC_VIDEO_ENGINE_VIE_INPUT_MANAGER_H_
 
 #include "webrtc/modules/video_capture/include/video_capture.h"
-#include "system_wrappers/interface/map_wrapper.h"
-#include "system_wrappers/interface/scoped_ptr.h"
-#include "typedefs.h"  // NOLINT
-#include "video_engine/include/vie_capture.h"
-#include "video_engine/vie_defines.h"
-#include "video_engine/vie_frame_provider_base.h"
-#include "video_engine/vie_manager_base.h"
+#include "webrtc/system_wrappers/interface/map_wrapper.h"
+#include "webrtc/system_wrappers/interface/scoped_ptr.h"
+#include "webrtc/typedefs.h"
+#include "webrtc/video_engine/include/vie_capture.h"
+#include "webrtc/video_engine/vie_defines.h"
+#include "webrtc/video_engine/vie_frame_provider_base.h"
+#include "webrtc/video_engine/vie_manager_base.h"
 
 namespace webrtc {
 
+class Config;
 class CriticalSectionWrapper;
 class ProcessThread;
 class RWLockWrapper;
@@ -33,7 +34,7 @@ class VoiceEngine;
 class ViEInputManager : private ViEManagerBase {
   friend class ViEInputManagerScoped;
  public:
-  explicit ViEInputManager(int engine_id);
+  ViEInputManager(int engine_id, const Config& config);
   ~ViEInputManager();
 
   void SetModuleProcessThread(ProcessThread* module_process_thread);
@@ -42,26 +43,26 @@ class ViEInputManager : private ViEManagerBase {
   int NumberOfCaptureDevices();
 
   // Gets name and id for a capture device.
-  int GetDeviceName(WebRtc_UWord32 device_number,
+  int GetDeviceName(uint32_t device_number,
                     char* device_nameUTF8,
-                    WebRtc_UWord32 device_name_length,
+                    uint32_t device_name_length,
                     char* device_unique_idUTF8,
-                    WebRtc_UWord32 device_unique_idUTF8Length);
+                    uint32_t device_unique_idUTF8Length);
 
   // Returns the number of capture capabilities for a specified device.
   int NumberOfCaptureCapabilities(const char* device_unique_idUTF8);
 
   // Gets a specific capability for a capture device.
   int GetCaptureCapability(const char* device_unique_idUTF8,
-                           const WebRtc_UWord32 device_capability_number,
+                           const uint32_t device_capability_number,
                            CaptureCapability& capability);
 
   // Show OS specific Capture settings.
   int DisplayCaptureSettingsDialogBox(const char* device_unique_idUTF8,
                                       const char* dialog_titleUTF8,
                                       void* parent_window,
-                                      WebRtc_UWord32 positionX,
-                                      WebRtc_UWord32 positionY);
+                                      uint32_t positionX,
+                                      uint32_t positionY);
   int GetOrientation(const char* device_unique_idUTF8,
                      RotateCapturedFrame& orientation);
 
@@ -69,7 +70,7 @@ class ViEInputManager : private ViEManagerBase {
   // a capture device id for the device.
   // Return zero on success, ViEError on failure.
   int CreateCaptureDevice(const char* device_unique_idUTF8,
-                          const WebRtc_UWord32 device_unique_idUTF8Length,
+                          const uint32_t device_unique_idUTF8Length,
                           int& capture_id);
   int CreateCaptureDevice(VideoCaptureModule* capture_module,
                           int& capture_id);
@@ -109,6 +110,7 @@ class ViEInputManager : private ViEManagerBase {
   // Gets the ViEFilePlayer for this file_id.
   ViEFilePlayer* ViEFilePlayerPtr(int file_id) const;
 
+  const Config& config_;
   int engine_id_;
   scoped_ptr<CriticalSectionWrapper> map_cs_;
   scoped_ptr<CriticalSectionWrapper> device_info_cs_;

@@ -8,13 +8,13 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "modules/video_processing/main/test/unit_test/unit_test.h"
+#include "webrtc/modules/video_processing/main/test/unit_test/unit_test.h"
 
 #include <string>
 
-#include "common_video/libyuv/include/webrtc_libyuv.h"
-#include "system_wrappers/interface/tick_util.h"
-#include "test/testsupport/fileutils.h"
+#include "webrtc/common_video/libyuv/include/webrtc_libyuv.h"
+#include "webrtc/system_wrappers/interface/tick_util.h"
+#include "webrtc/test/testsupport/fileutils.h"
 
 namespace webrtc {
 
@@ -233,8 +233,8 @@ TEST_F(VideoProcessingModuleTest, Resampler)
 {
   enum { NumRuns = 1 };
 
-  WebRtc_Word64 minRuntime = 0;
-  WebRtc_Word64 avgRuntime = 0;
+  int64_t minRuntime = 0;
+  int64_t avgRuntime = 0;
 
   TickTime t0;
   TickTime t1;
@@ -258,7 +258,7 @@ TEST_F(VideoProcessingModuleTest, Resampler)
                              _width, _height,
                              0, kRotateNone, &_videoFrame));
 
-  for (WebRtc_UWord32 runIdx = 0; runIdx < NumRuns; runIdx++)
+  for (uint32_t runIdx = 0; runIdx < NumRuns; runIdx++)
   {
     // initiate test timer
     t0 = TickTime::Now();

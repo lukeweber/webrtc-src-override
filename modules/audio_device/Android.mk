@@ -28,11 +28,12 @@ LOCAL_SRC_FILES := \
 
 # Flags passed to both C and C++ files.
 LOCAL_CFLAGS := \
-    $(MY_WEBRTC_COMMON_DEFS)
+    $(MY_WEBRTC_COMMON_DEFS) \
+	-DWEBRTC_ANDROID_OPENSLES
 
 LOCAL_C_INCLUDES := \
-    $(MY_THIRD_PARTY_PATH) \
-    $(MY_WEBRTC_PATH) \
+    $(MY_THIRD_PARTY_PATH)/ \
+    $(MY_WEBRTC_PATH)/ \
     $(MY_WEBRTC_PATH)/modules/interface \
     $(MY_WEBRTC_PATH)/common_audio/resampler/include \
     $(MY_WEBRTC_PATH)/common_audio/signal_processing/include \

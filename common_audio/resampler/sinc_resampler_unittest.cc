@@ -19,6 +19,8 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "webrtc/common_audio/resampler/sinc_resampler.h"
+#include "webrtc/common_audio/resampler/sinusoidal_linear_chirp_source.h"
+#include "webrtc/system_wrappers/interface/cpu_features_wrapper.h"
 #include "webrtc/system_wrappers/interface/scoped_ptr.h"
 #include "webrtc/system_wrappers/interface/stringize_macros.h"
 #include "webrtc/system_wrappers/interface/tick_util.h"
@@ -96,9 +98,9 @@ TEST(SincResamplerTest, Flush) {
 }
 
 // Define platform independent function name for Convolve* tests.
-#if defined(WEBRTC_USE_SSE2) && defined(__SSE__)
+#if defined(WEBRTC_ARCH_X86_FAMILY)
 #define CONVOLVE_FUNC Convolve_SSE
-#elif defined(WEBRTC_ARCH_ARM_NEON) || defined(WEBRTC_DETECT_ARM_NEON)
+#elif defined(WEBRTC_ARCH_ARM_V7)
 #define CONVOLVE_FUNC Convolve_NEON
 #endif
 
@@ -107,6 +109,12 @@ TEST(SincResamplerTest, Flush) {
 // will be tested by the parameterized SincResampler tests below.
 #if defined(CONVOLVE_FUNC)
 TEST(SincResamplerTest, Convolve) {
+#if defined(WEBRTC_ARCH_X86_FAMILY)
+  ASSERT_TRUE(WebRtc_GetCPUInfo(kSSE2));
+#elif defined(WEBRTC_ARCH_ARM_V7)
+  ASSERT_TRUE(WebRtc_GetCPUFeaturesARM() & kCPUFeatureNEON);
+#endif
+
   // Initialize a dummy resampler.
   MockSource mock_source;
   SincResampler resampler(kSampleRateRatio, &mock_source);
@@ -161,6 +169,12 @@ TEST(SincResamplerTest, ConvolveBenchmark) {
   printf("Convolve_C took %.2fms.\n", total_time_c_us / 1000);
 
 #if defined(CONVOLVE_FUNC)
+#if defined(WEBRTC_ARCH_X86_FAMILY)
+  ASSERT_TRUE(WebRtc_GetCPUInfo(kSSE2));
+#elif defined(WEBRTC_ARCH_ARM_V7)
+  ASSERT_TRUE(WebRtc_GetCPUFeaturesARM() & kCPUFeatureNEON);
+#endif
+
   // Benchmark with unaligned input pointer.
   start = TickTime::Now();
   for (int j = 0; j < kConvolveIterations; ++j) {
@@ -194,58 +208,6 @@ TEST(SincResamplerTest, ConvolveBenchmark) {
 
 #undef CONVOLVE_FUNC
 
-// Fake audio source for testing the resampler.  Generates a sinusoidal linear
-// chirp (http://en.wikipedia.org/wiki/Chirp) which can be tuned to stress the
-// resampler for the specific sample rate conversion being used.
-class SinusoidalLinearChirpSource : public SincResamplerCallback {
- public:
-  SinusoidalLinearChirpSource(int sample_rate, int samples,
-                              double max_frequency)
-      : sample_rate_(sample_rate),
-        total_samples_(samples),
-        max_frequency_(max_frequency),
-        current_index_(0) {
-    // Chirp rate.
-    double duration = static_cast<double>(total_samples_) / sample_rate_;
-    k_ = (max_frequency_ - kMinFrequency) / duration;
-  }
-
-  virtual ~SinusoidalLinearChirpSource() {}
-
-  virtual void Run(float* destination, int frames) {
-    for (int i = 0; i < frames; ++i, ++current_index_) {
-      // Filter out frequencies higher than Nyquist.
-      if (Frequency(current_index_) > 0.5 * sample_rate_) {
-        destination[i] = 0;
-      } else {
-        // Calculate time in seconds.
-        double t = static_cast<double>(current_index_) / sample_rate_;
-
-        // Sinusoidal linear chirp.
-        destination[i] = sin(2 * M_PI * (kMinFrequency * t + (k_ / 2) * t * t));
-      }
-    }
-  }
-
-  double Frequency(int position) {
-    return kMinFrequency + position * (max_frequency_ - kMinFrequency)
-        / total_samples_;
-  }
-
- private:
-  enum {
-    kMinFrequency = 5
-  };
-
-  double sample_rate_;
-  int total_samples_;
-  double max_frequency_;
-  double k_;
-  int current_index_;
-
-  DISALLOW_COPY_AND_ASSIGN(SinusoidalLinearChirpSource);
-};
-
 typedef std::tr1::tuple<int, int, double, double> SincResamplerTestData;
 class SincResamplerTest
     : public testing::TestWithParam<SincResamplerTestData> {
@@ -270,19 +232,32 @@ class SincResamplerTest
 TEST_P(SincResamplerTest, Resample) {
   // Make comparisons using one second of data.
   static const double kTestDurationSecs = 1;
-  int input_samples = kTestDurationSecs * input_rate_;
-  int output_samples = kTestDurationSecs * output_rate_;
+  const int input_samples = kTestDurationSecs * input_rate_;
+  const int output_samples = kTestDurationSecs * output_rate_;
 
   // Nyquist frequency for the input sampling rate.
-  double input_nyquist_freq = 0.5 * input_rate_;
+  const double input_nyquist_freq = 0.5 * input_rate_;
 
   // Source for data to be resampled.
   SinusoidalLinearChirpSource resampler_source(
-      input_rate_, input_samples, input_nyquist_freq);
+      input_rate_, input_samples, input_nyquist_freq, 0);
 
+  const double io_ratio = input_rate_ / static_cast<double>(output_rate_);
   SincResampler resampler(
-      input_rate_ / static_cast<double>(output_rate_),
+      io_ratio,
       &resampler_source);
+
+  // Force an update to the sample rate ratio to ensure dyanmic sample rate
+  // changes are working correctly.
+  scoped_array<float> kernel(new float[SincResampler::kKernelStorageSize]);
+  memcpy(kernel.get(), resampler.get_kernel_for_testing(),
+         SincResampler::kKernelStorageSize);
+  resampler.SetRatio(M_PI);
+  ASSERT_NE(0, memcmp(kernel.get(), resampler.get_kernel_for_testing(),
+                      SincResampler::kKernelStorageSize));
+  resampler.SetRatio(io_ratio);
+  ASSERT_EQ(0, memcmp(kernel.get(), resampler.get_kernel_for_testing(),
+                      SincResampler::kKernelStorageSize));
 
   // TODO(dalecurtis): If we switch to AVX/SSE optimization, we'll need to
   // allocate these on 32-byte boundaries and ensure they're sized % 32 bytes.
@@ -294,7 +269,7 @@ TEST_P(SincResamplerTest, Resample) {
 
   // Generate pure signal.
   SinusoidalLinearChirpSource pure_source(
-      output_rate_, output_samples, input_nyquist_freq);
+      output_rate_, output_samples, input_nyquist_freq, 0);
   pure_source.Run(pure_destination.get(), output_samples);
 
   // Range of the Nyquist frequency (0.5 * min(input rate, output_rate)) which
@@ -392,4 +367,3 @@ INSTANTIATE_TEST_CASE_P(
         std::tr1::make_tuple(192000, 192000, kResamplingRMSError, -73.52)));
 
 }  // namespace webrtc
-
