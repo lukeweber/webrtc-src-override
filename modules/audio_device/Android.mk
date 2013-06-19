@@ -28,8 +28,8 @@ LOCAL_SRC_FILES := \
 
 # Flags passed to both C and C++ files.
 LOCAL_CFLAGS := \
-    $(MY_WEBRTC_COMMON_DEFS) \
-	-DWEBRTC_ANDROID_OPENSLES
+    $(MY_WEBRTC_COMMON_DEFS)
+	#-DWEBRTC_ANDROID_OPENSLES - to test native opensles, enable this.
 
 LOCAL_C_INCLUDES := \
     $(MY_THIRD_PARTY_PATH)/ \
