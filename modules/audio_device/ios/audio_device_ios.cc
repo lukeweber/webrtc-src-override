@@ -1198,8 +1198,13 @@ int32_t AudioDeviceIPhone::InitPlayOrRecord() {
     AudioComponentDescription desc;
     AudioComponent comp;
 
-    desc.componentType = kAudioUnitType_Output;
+#if TARGET_IPHONE_SIMULATOR
+    desc.componentSubType = kAudioUnitSubType_RemoteIO;
+#else
     desc.componentSubType = kAudioUnitSubType_VoiceProcessingIO;
+#endif
+
+    desc.componentType = kAudioUnitType_Output;
     desc.componentManufacturer = kAudioUnitManufacturer_Apple;
     desc.componentFlags = 0;
     desc.componentFlagsMask = 0;
